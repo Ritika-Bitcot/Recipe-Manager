@@ -32,13 +32,13 @@ recipe_manager/
 │ └── 4_data_modeling.md # SQLAlchemy + Alembic modeling
 │
 ├── step3/ # API implementation docs
-│ ├── create-recipe.md # Guide: Create recipe API
-│ ├── delete-recipe.md # Guide: Delete recipe API
-│ ├── get-all-recipes.md # Guide: List recipes API
-│ ├── get-recipe-by-id.md # Guide: Get recipe by ID API
-│ ├── update-recipe.md # Guide: Update recipe API
-│ ├── user-login-api.md # Guide: Login API
-│ └── user-registration.md # Guide: Register API
+│ ├── 1_user-login-api.md # Guide: Login API
+│ └── 2_user-registration.md # Guide: Register API
+│ ├── 3_create-recipe.md # Guide: Create recipe API
+│ ├── 4_get-all-recipes.md # Guide: List recipes API
+│ ├── 5_get-recipe-by-id.md # Guide: Get recipe by ID API
+│ ├── 6_delete-recipe.md # Guide: Delete recipe API
+│ ├── 7_update-recipe.md # Guide: Update recipe API
 │
 ├── step4/ # Testing & best practices
 │ ├── api_testing_guide.md # Testing API endpoints
