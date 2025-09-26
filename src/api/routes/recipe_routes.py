@@ -46,11 +46,7 @@ def create_recipe():
 
     except ValidationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Validation Error", message=str(e), status_code=400
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
             400,
         )
 
@@ -99,11 +95,7 @@ def get_recipes():
 
     except ValidationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Validation Error", message=str(e), status_code=400
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
             400,
         )
 
@@ -134,9 +126,7 @@ def get_recipe(recipe_id):
 
     except NotFoundError as e:
         return (
-            jsonify(
-                ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()
-            ),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
             404,
         )
 
@@ -183,19 +173,13 @@ def update_recipe(recipe_id):
 
     except NotFoundError as e:
         return (
-            jsonify(
-                ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()
-            ),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
             404,
         )
 
     except ValidationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Validation Error", message=str(e), status_code=400
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
             400,
         )
 
@@ -226,19 +210,13 @@ def delete_recipe(recipe_id):
             return jsonify({"message": "Recipe deleted successfully"}), 200
         else:
             return (
-                jsonify(
-                    ErrorResponse(
-                        error="Not Found", message="Recipe not found", status_code=404
-                    ).dict()
-                ),
+                jsonify(ErrorResponse(error="Not Found", message="Recipe not found", status_code=404).dict()),
                 404,
             )
 
     except NotFoundError as e:
         return (
-            jsonify(
-                ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()
-            ),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
             404,
         )
 

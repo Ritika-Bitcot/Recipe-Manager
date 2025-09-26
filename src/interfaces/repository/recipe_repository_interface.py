@@ -14,16 +14,12 @@ class RecipeRepositoryInterface(BaseRepositoryInterface[Recipe]):
     """Recipe repository interface defining recipe-specific operations."""
 
     @abstractmethod
-    def get_by_owner(
-        self, session: Session, owner_id: int, skip: int = 0, limit: int = 100
-    ) -> List[Recipe]:
+    def get_by_owner(self, session: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Recipe]:
         """Get recipes by owner ID with pagination."""
         pass
 
     @abstractmethod
-    def get_by_owner_and_id(
-        self, session: Session, recipe_id: int, owner_id: int
-    ) -> Optional[Recipe]:
+    def get_by_owner_and_id(self, session: Session, recipe_id: int, owner_id: int) -> Optional[Recipe]:
         """Get recipe by ID and owner ID (for authorization)."""
         pass
 

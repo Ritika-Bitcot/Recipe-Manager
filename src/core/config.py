@@ -7,9 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     DATABASE_URL: str
     SECRET_KEY: str
@@ -17,9 +15,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "app.log"
-    LOG_FORMAT: str = (
-        "%(levelname)-8s %(asctime)s %(name)s.%(module)s:%(lineno)s | %(message)s"
-    )
+    LOG_FORMAT: str = "%(levelname)-8s %(asctime)s %(name)s.%(module)s:%(lineno)s | %(message)s"
     LOG_BODY: bool = False
     LOGGER_TYPE: str = "development"
     ALGORITHM: str = "HS256"
@@ -31,9 +27,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v):
         if not v.startswith(("postgresql://", "postgresql+psycopg2://", "sqlite://")):
-            raise ValueError(
-                "DATABASE_URL must use postgresql://, postgresql+psycopg2://, or sqlite:// format"
-            )
+            raise ValueError("DATABASE_URL must use postgresql://, postgresql+psycopg2://, or sqlite:// format")
         return v
 
     @field_validator("SECRET_KEY")

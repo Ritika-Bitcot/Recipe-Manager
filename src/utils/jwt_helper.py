@@ -18,8 +18,7 @@ class JWTHelper:
         payload = {
             "user_id": user_id,
             "email": email,
-            "exp": datetime.utcnow()
-            + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+            "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
             "iat": datetime.utcnow(),
         }
 
@@ -29,9 +28,7 @@ class JWTHelper:
     def verify_token(token: str) -> Optional[Dict[str, Any]]:
         """Verify JWT token and return payload."""
         try:
-            payload = jwt.decode(
-                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-            )
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             return payload
         except jwt.ExpiredSignatureError:
             raise AuthenticationError("Token has expired")
@@ -66,5 +63,5 @@ class JWTHelper:
             if exp:
                 return datetime.utcnow() > datetime.fromtimestamp(exp)
             return True
-        except:
+        except jwt.PyJWTError:
             return True

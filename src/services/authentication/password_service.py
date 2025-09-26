@@ -18,14 +18,10 @@ class PasswordService:
             raise ValidationError("Password is required", "password")
 
         if len(password) < 8:
-            raise ValidationError(
-                "Password must be at least 8 characters long", "password"
-            )
+            raise ValidationError("Password must be at least 8 characters long", "password")
 
         if len(password) > 128:
-            raise ValidationError(
-                "Password must be less than 128 characters", "password"
-            )
+            raise ValidationError("Password must be less than 128 characters", "password")
 
         if not self.password_helper.is_password_strong(password):
             raise ValidationError(

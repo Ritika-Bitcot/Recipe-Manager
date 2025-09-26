@@ -52,19 +52,13 @@ def register():
 
     except ConflictError as e:
         return (
-            jsonify(
-                ErrorResponse(error="Conflict", message=str(e), status_code=409).dict()
-            ),
+            jsonify(ErrorResponse(error="Conflict", message=str(e), status_code=409).dict()),
             409,
         )
 
     except ValidationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Validation Error", message=str(e), status_code=400
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
             400,
         )
 
@@ -117,21 +111,13 @@ def login():
 
     except AuthenticationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Authentication Error", message=str(e), status_code=401
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Authentication Error", message=str(e), status_code=401).dict()),
             401,
         )
 
     except ValidationError as e:
         return (
-            jsonify(
-                ErrorResponse(
-                    error="Validation Error", message=str(e), status_code=400
-                ).dict()
-            ),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
             400,
         )
 
@@ -165,11 +151,7 @@ def get_current_user():
 
         if not user:
             return (
-                jsonify(
-                    ErrorResponse(
-                        error="Not Found", message="User not found", status_code=404
-                    ).dict()
-                ),
+                jsonify(ErrorResponse(error="Not Found", message="User not found", status_code=404).dict()),
                 404,
             )
 

@@ -27,8 +27,4 @@ class UserRepository(BaseRepository[User], UserRepositoryInterface):
 
     def get_active_user(self, session: Session, user_id: int) -> Optional[User]:
         """Get active user by ID."""
-        return (
-            session.query(User)
-            .filter(User.id == user_id, User.is_active == True)
-            .first()
-        )
+        return session.query(User).filter(User.id == user_id, User.is_active is True).first()

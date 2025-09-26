@@ -5,9 +5,7 @@ from typing import Any, Dict, Optional
 
 from src.core.database import get_db_session
 from src.core.exceptions import NotFoundError
-from src.interfaces.repository.recipe_repository_interface import (
-    RecipeRepositoryInterface,
-)
+from src.interfaces.repository.recipe_repository_interface import RecipeRepositoryInterface
 from src.interfaces.service.recipe_service_interface import RecipeServiceInterface
 from src.repositories.recipe_repository import RecipeRepository
 from src.schemas.recipe_schema import RecipeCreate, RecipeListResponse, RecipeUpdate
@@ -27,22 +25,16 @@ class RecipeService(RecipeServiceInterface):
             # Prepare recipe data
             recipe_dict = {
                 "title": recipe_data.title.strip(),
-                "description": (
-                    recipe_data.description.strip() if recipe_data.description else None
-                ),
+                "description": (recipe_data.description.strip() if recipe_data.description else None),
                 "ingredients": recipe_data.ingredients,  # Already a list of strings
                 "instructions": recipe_data.instructions,  # Already a list of strings
                 "prep_time_minutes": recipe_data.prep_time,
                 "cook_time_minutes": recipe_data.cook_time,
                 "servings": recipe_data.servings,
                 "difficulty": recipe_data.difficulty,
-                "cuisine": (
-                    recipe_data.cuisine.strip() if recipe_data.cuisine else None
-                ),
+                "cuisine": (recipe_data.cuisine.strip() if recipe_data.cuisine else None),
                 "tags": recipe_data.tags,
-                "image_url": (
-                    recipe_data.image_url.strip() if recipe_data.image_url else None
-                ),
+                "image_url": (recipe_data.image_url.strip() if recipe_data.image_url else None),
                 "is_public": recipe_data.is_public,
                 "owner_id": user_id,
             }
@@ -66,9 +58,7 @@ class RecipeService(RecipeServiceInterface):
         session = get_db_session()
 
         try:
-            recipe = self.recipe_repository.get_by_owner_and_id(
-                session, recipe_id, user_id
-            )
+            recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             if not recipe:
                 raise NotFoundError("Recipe not found")
 
@@ -98,27 +88,13 @@ class RecipeService(RecipeServiceInterface):
 
             # Get recipes based on filters
             if search:
-                recipes = self.recipe_repository.search_by_title(
-                    session, search, user_id, skip, per_page
-                )
-                total = len(
-                    self.recipe_repository.search_by_title(
-                        session, search, user_id, 0, 1000
-                    )
-                )
+                recipes = self.recipe_repository.search_by_title(session, search, user_id, skip, per_page)
+                total = len(self.recipe_repository.search_by_title(session, search, user_id, 0, 1000))
             elif category:
-                recipes = self.recipe_repository.get_by_category(
-                    session, category, user_id, skip, per_page
-                )
-                total = len(
-                    self.recipe_repository.get_by_category(
-                        session, category, user_id, 0, 1000
-                    )
-                )
+                recipes = self.recipe_repository.get_by_category(session, category, user_id, skip, per_page)
+                total = len(self.recipe_repository.get_by_category(session, category, user_id, 0, 1000))
             else:
-                recipes = self.recipe_repository.get_by_owner(
-                    session, user_id, skip, per_page
-                )
+                recipes = self.recipe_repository.get_by_owner(session, user_id, skip, per_page)
                 total = self.recipe_repository.count_by_owner(session, user_id)
 
             # Calculate pagination info
@@ -137,17 +113,13 @@ class RecipeService(RecipeServiceInterface):
         finally:
             session.close()
 
-    def update_recipe(
-        self, recipe_id: int, recipe_data: RecipeUpdate, user_id: int
-    ) -> Dict[str, Any]:
+    def update_recipe(self, recipe_id: int, recipe_data: RecipeUpdate, user_id: int) -> Dict[str, Any]:
         """Update a recipe for a specific user."""
         session = get_db_session()
 
         try:
             # Check if recipe exists and belongs to user
-            existing_recipe = self.recipe_repository.get_by_owner_and_id(
-                session, recipe_id, user_id
-            )
+            existing_recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             if not existing_recipe:
                 raise NotFoundError("Recipe not found")
 
@@ -172,9 +144,7 @@ class RecipeService(RecipeServiceInterface):
                         update_dict[field] = value
 
             # Update recipe
-            updated_recipe = self.recipe_repository.update(
-                session, recipe_id, update_dict
-            )
+            updated_recipe = self.recipe_repository.update(session, recipe_id, update_dict)
 
             return {
                 "recipe": updated_recipe.to_dict(),
@@ -193,9 +163,7 @@ class RecipeService(RecipeServiceInterface):
 
         try:
             # Check if recipe exists and belongs to user
-            existing_recipe = self.recipe_repository.get_by_owner_and_id(
-                session, recipe_id, user_id
-            )
+            existing_recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             if not existing_recipe:
                 raise NotFoundError("Recipe not found")
 
@@ -215,9 +183,7 @@ class RecipeService(RecipeServiceInterface):
         session = get_db_session()
 
         try:
-            recipe = self.recipe_repository.get_by_owner_and_id(
-                session, recipe_id, user_id
-            )
+            recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             return recipe is not None
         except Exception:
             return False

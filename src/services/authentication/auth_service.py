@@ -74,9 +74,7 @@ class AuthService(AuthServiceInterface):
                 raise AuthenticationError("Account is deactivated")
 
             # Verify password
-            if not self.password_helper.verify_password(
-                login_data.password, user.password_hash
-            ):
+            if not self.password_helper.verify_password(login_data.password, user.password_hash):
                 raise AuthenticationError("Invalid email or password")
 
             # Generate token

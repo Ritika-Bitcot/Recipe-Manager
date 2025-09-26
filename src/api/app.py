@@ -147,9 +147,7 @@ def create_app() -> Flask:
     # Root endpoint
     @app.route("/")
     def root():
-        return jsonify(
-            {"message": "Recipe Manager API", "version": "1.0.0", "status": "running"}
-        )
+        return jsonify({"message": "Recipe Manager API", "version": "1.0.0", "status": "running"})
 
     # Create database tables
     with app.app_context():

@@ -32,9 +32,7 @@ class RecipeServiceInterface(ABC):
         pass
 
     @abstractmethod
-    def update_recipe(
-        self, recipe_id: int, recipe_data: RecipeUpdate, user_id: int
-    ) -> Dict[str, Any]:
+    def update_recipe(self, recipe_id: int, recipe_data: RecipeUpdate, user_id: int) -> Dict[str, Any]:
         """Update a recipe for a specific user."""
         pass
 
