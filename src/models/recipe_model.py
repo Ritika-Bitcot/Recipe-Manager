@@ -40,6 +40,21 @@ class Recipe(db.Model):
     def __repr__(self) -> str:
         return f"<Recipe(id={self.id}, title='{self.title}', owner_id={self.owner_id})>"
 
+    @property
+    def user_id(self) -> int:
+        """Alias for owner_id for backward compatibility."""
+        return self.owner_id
+
+    @property
+    def prep_time(self) -> int:
+        """Alias for prep_time_minutes for backward compatibility."""
+        return self.prep_time_minutes
+
+    @property
+    def cook_time(self) -> int:
+        """Alias for cook_time_minutes for backward compatibility."""
+        return self.cook_time_minutes
+
     def to_dict(self) -> dict:
         """Convert recipe to dictionary."""
         return {
@@ -57,6 +72,7 @@ class Recipe(db.Model):
             "image_url": self.image_url,
             "is_public": self.is_public,
             "owner_id": self.owner_id,
+            "user_id": self.user_id,  # Add user_id for backward compatibility
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

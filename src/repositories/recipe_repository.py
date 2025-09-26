@@ -1,6 +1,6 @@
 """Recipe repository implementation."""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -62,3 +62,147 @@ class RecipeRepository(BaseRepository[Recipe], RecipeRepositoryInterface):
             .limit(limit)
             .all()
         )
+
+    # Additional sync methods expected by tests
+    def get_user_recipes(self, session: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[Recipe]:
+        """Get recipes by user ID with pagination (alias for get_by_owner)."""
+        return self.get_by_owner(session, user_id, skip, limit)
+
+    def search_recipes(
+        self,
+        session: Session,
+        user_id: int,
+        search_params: Dict[str, Any],
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Recipe]:
+        """Search recipes with various filters."""
+        query = session.query(Recipe).filter(Recipe.owner_id == user_id)
+
+        if search_params.get("search"):
+            query = query.filter(Recipe.title.ilike(f"%{search_params['search']}%"))
+
+        if search_params.get("difficulty"):
+            query = query.filter(Recipe.difficulty == search_params["difficulty"])
+
+        if search_params.get("prep_time_max"):
+            query = query.filter(Recipe.prep_time_minutes <= search_params["prep_time_max"])
+
+        if search_params.get("cook_time_max"):
+            query = query.filter(Recipe.cook_time_minutes <= search_params["cook_time_max"])
+
+        if search_params.get("tags"):
+            tags = search_params["tags"]
+            if isinstance(tags, list):
+                for tag in tags:
+                    query = query.filter(Recipe.tags.contains([tag]))
+
+        return query.offset(skip).limit(limit).all()
+
+    # Async methods expected by tests
+    async def create_async(self, session: Session, obj_in: Dict[str, Any]) -> Recipe:
+        """Create a new record asynchronously."""
+        return self.create(session, obj_in)
+
+    async def get_by_id_async(self, session: Session, id: int) -> Optional[Recipe]:
+        """Get a record by ID asynchronously."""
+        return self.get_by_id(session, id)
+
+    async def update_async(self, session: Session, id: int, obj_in: Dict[str, Any]) -> Optional[Recipe]:
+        """Update a record by ID asynchronously."""
+        return self.update(session, id, obj_in)
+
+    async def delete_async(self, session: Session, id: int) -> bool:
+        """Delete a record by ID asynchronously."""
+        return self.delete(session, id)
+
+    async def get_user_recipes_async(
+        self,
+        session: Session,
+        user_id: int,
+        page: int = 1,
+        per_page: int = 10,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> List[Recipe]:
+        """Get recipes by user ID asynchronously with pagination."""
+        skip = (page - 1) * per_page
+        query = session.query(Recipe).filter(Recipe.owner_id == user_id)
+
+        # Add sorting
+        if hasattr(Recipe, sort_by):
+            if sort_order.lower() == "desc":
+                query = query.order_by(getattr(Recipe, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Recipe, sort_by).asc())
+
+        return query.offset(skip).limit(per_page).all()
+
+    async def count_user_recipes_async(self, session: Session, user_id: int) -> int:
+        """Count recipes by user ID asynchronously."""
+        return self.count_by_owner(session, user_id)
+
+    async def search_recipes_async(
+        self,
+        session: Session,
+        user_id: int,
+        search_params: Dict[str, Any],
+        page: int = 1,
+        per_page: int = 10,
+    ) -> List[Recipe]:
+        """Search recipes asynchronously with various filters."""
+        skip = (page - 1) * per_page
+        return self.search_recipes(session, user_id, search_params, skip, per_page)
+
+    async def count_search_recipes_async(self, session: Session, user_id: int, search_params: Dict[str, Any]) -> int:
+        """Count search results asynchronously."""
+        query = session.query(Recipe).filter(Recipe.owner_id == user_id)
+
+        if search_params.get("search"):
+            query = query.filter(Recipe.title.ilike(f"%{search_params['search']}%"))
+
+        if search_params.get("difficulty"):
+            query = query.filter(Recipe.difficulty == search_params["difficulty"])
+
+        if search_params.get("prep_time_max"):
+            query = query.filter(Recipe.prep_time_minutes <= search_params["prep_time_max"])
+
+        if search_params.get("cook_time_max"):
+            query = query.filter(Recipe.cook_time_minutes <= search_params["cook_time_max"])
+
+        if search_params.get("tags"):
+            tags = search_params["tags"]
+            if isinstance(tags, list):
+                for tag in tags:
+                    query = query.filter(Recipe.tags.contains([tag]))
+
+        return query.count()
+
+    # Additional sync methods expected by tests
+    def count_user_recipes(self, session: Session, user_id: int) -> int:
+        """Count recipes by user ID (alias for count_by_owner)."""
+        return self.count_by_owner(session, user_id)
+
+    def count_search_recipes(self, session: Session, user_id: int, search_params: Dict[str, Any]) -> int:
+        """Count search results."""
+        query = session.query(Recipe).filter(Recipe.owner_id == user_id)
+
+        if search_params.get("search"):
+            query = query.filter(Recipe.title.ilike(f"%{search_params['search']}%"))
+
+        if search_params.get("difficulty"):
+            query = query.filter(Recipe.difficulty == search_params["difficulty"])
+
+        if search_params.get("prep_time_max"):
+            query = query.filter(Recipe.prep_time_minutes <= search_params["prep_time_max"])
+
+        if search_params.get("cook_time_max"):
+            query = query.filter(Recipe.cook_time_minutes <= search_params["cook_time_max"])
+
+        if search_params.get("tags"):
+            tags = search_params["tags"]
+            if isinstance(tags, list):
+                for tag in tags:
+                    query = query.filter(Recipe.tags.contains([tag]))
+
+        return query.count()

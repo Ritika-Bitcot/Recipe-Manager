@@ -10,6 +10,8 @@ from src.repositories.user_repository import UserRepository
 from src.schemas.user_schema import UserCreate, UserLogin
 from src.utils.jwt_helper import JWTHelper
 from src.utils.password_helper import PasswordHelper
+from src.validators.email_validator import validate_email
+from src.validators.password_validator import validate_password
 
 
 class AuthService(AuthServiceInterface):
@@ -25,16 +27,20 @@ class AuthService(AuthServiceInterface):
         session = get_db_session()
 
         try:
+            # Validate email and password using centralized validators
+            validated_email = validate_email(user_data.email)
+            validate_password(user_data.password)
+
             # Check if email already exists
-            if self.user_repository.email_exists(session, user_data.email):
-                raise ConflictError("Email already registered")
+            if self.user_repository.email_exists(session, validated_email):
+                raise ConflictError("Email already registered", "email")
 
             # Hash password
             hashed_password = self.password_helper.hash_password(user_data.password)
 
             # Create user data
             user_dict = {
-                "email": user_data.email.lower().strip(),
+                "email": validated_email,
                 "password_hash": hashed_password,
                 "first_name": user_data.first_name.strip(),
                 "last_name": user_data.last_name.strip(),
@@ -64,8 +70,11 @@ class AuthService(AuthServiceInterface):
         session = get_db_session()
 
         try:
+            # Validate email format
+            validated_email = validate_email(login_data.email)
+
             # Get user by email
-            user = self.user_repository.get_by_email(session, login_data.email)
+            user = self.user_repository.get_by_email(session, validated_email)
             if not user:
                 raise AuthenticationError("Invalid email or password")
 

@@ -62,8 +62,8 @@ recipe_manager/
 │ ├── core/ # Core utilities & configs
 │ │ ├── config.py # Env-based settings
 │ │ ├── database.py # SQLAlchemy + Alembic setup
-│ │ ├── exceptions.py # Custom exceptions
-│ │ └── validators.py # Input validators
+│ │ ├── exceptions.py # Custom exceptions hierarchy
+│ │ └── error_handler.py # Centralized error handling
 │ │
 │ ├── interfaces/ # Abstract contracts (SOLID)
 │ │ ├── repository/ # Repository interfaces
@@ -85,6 +85,7 @@ recipe_manager/
 │ │ └── recipe_repository.py # Recipe DB logic
 │ │
 │ ├── schemas/ # Pydantic request/response models
+│ │ ├── common_schemas.py # Shared schemas & validators
 │ │ ├── user_schema.py # User validation
 │ │ ├── auth_schema.py # Login/Register schemas
 │ │ └── recipe_schema.py # Recipe validation
@@ -100,25 +101,25 @@ recipe_manager/
 │ │ ├── jwt_helper.py # JWT encode/decode helpers
 │ │ └── password_helper.py # Bcrypt helpers
 │ │
-│ └── init.py
+│ ├── validators/ # Input validation layer
+│ │ ├── email_validator.py # Email validation
+│ │ ├── password_validator.py # Password validation
+│ │ ├── recipe_validator.py # Recipe validation
+│ │ ├── query_validators.py # Query parameter validation
+│ │ └── token_validator.py # JWT token validation
+│ │
+│ └── __init__.py
 │
-├── tests/ # Test suite
-│ ├── api/ # API endpoint tests
-│ │ ├── conftest.py # API fixtures
-│ │ ├── test_auth_routes.py # Test /auth endpoints
-│ │ └── test_recipe_routes.py # Test /recipes endpoints
-│ │
-│ ├── integration/ # Integration tests
-│ │ ├── test_auth_system.py # End-to-end auth flow
-│ │ ├── test_database.py # DB migrations + models
-│ │ └── test_recipe_system.py # End-to-end recipe lifecycle
-│ │
-│ └── unit/ # Unit tests
-│ ├── conftest.py # Unit fixtures
-│ ├── test_auth_service.py # Test auth service
-│ ├── test_password_service.py # Test password service
-│ ├── test_recipe_service.py # Test recipe service
-│ └── test_models.py # Test ORM models
+├── tests/ # Test suite (flat structure)
+│ ├── conftest.py # Test fixtures and configuration
+│ ├── test_auth_routes.py # Test /auth endpoints
+│ ├── test_recipe_routes.py # Test /recipes endpoints
+│ ├── test_health_routes.py # Test health check endpoints
+│ ├── test_error_handling.py # Test centralized error handling
+│ ├── test_validators.py # Test validation functions
+│ ├── test_models.py # Test ORM models
+│ ├── test_services.py # Test service layer
+│ └── test_async_services.py # Test async service layer
 │
 ├── .env.example # Example env config
 ├── alembic.ini # Alembic config file
@@ -133,6 +134,8 @@ recipe_manager/
 
 ## Notes
 - This structure is designed to **never require rewriting** as the project grows.  
-- Each file/folder has a **clear responsibility** aligned with **SOLID principles**.  
+- Each file/folder has a **clear responsibility** aligned with **SOLID principles**.
+- **PostgreSQL required**: Application uses PostgreSQL exclusively.
+- **Simplified configuration**: No complex settings management.  
 
 ---

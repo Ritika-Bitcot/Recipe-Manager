@@ -1,10 +1,12 @@
 """Recipe routes for CRUD operations."""
 
+import json
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError as PydanticValidationError
 
-from src.core.exceptions import NotFoundError, ValidationError
+from src.core.exceptions import ResourceNotFoundError, ValidationError
 from src.schemas.auth_schema import ErrorResponse
 from src.schemas.recipe_schema import RecipeCreate, RecipeUpdate
 from src.services.recipe_management.recipe_service import RecipeService
@@ -23,9 +25,35 @@ def create_recipe():
     try:
         user_id = int(get_jwt_identity())
 
-        # Validate request data
+        # Get and validate request data
         try:
-            recipe_data = RecipeCreate(**request.get_json())
+            request_data = request.get_json()
+        except (json.JSONDecodeError, TypeError, Exception):
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Invalid JSON data",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        if request_data is None:
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Request body is required",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        try:
+            recipe_data = RecipeCreate(**request_data)
         except PydanticValidationError as e:
             return (
                 jsonify(
@@ -34,19 +62,22 @@ def create_recipe():
                         message="Invalid input data",
                         status_code=400,
                         details=e.errors(),
-                    ).dict()
+                    ).model_dump()
                 ),
                 400,
             )
 
         # Create recipe
-        result = recipe_service.create_recipe(recipe_data, user_id)
+        from src.core.database import get_db_session
+
+        session = get_db_session()
+        result = recipe_service.create_recipe(session, recipe_data, user_id)
 
         return jsonify(result), 201
 
     except ValidationError as e:
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
             400,
         )
 
@@ -57,7 +88,7 @@ def create_recipe():
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -73,29 +104,42 @@ def get_recipes():
         # Get query parameters
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 10))
-        search = request.args.get("search")
-        category = request.args.get("category")
 
         # Validate pagination parameters
         if page < 1:
-            page = 1
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Page number must be greater than 0",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
         if per_page < 1 or per_page > 100:
-            per_page = 10
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Per page must be between 1 and 100",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
 
         # Get recipes
-        result = recipe_service.get_user_recipes(
-            user_id=user_id,
-            page=page,
-            per_page=per_page,
-            search=search,
-            category=category,
-        )
+        from src.core.database import get_db_session
 
-        return jsonify(result.dict()), 200
+        session = get_db_session()
+        result = recipe_service.list_recipes(session, user_id, page, per_page)
+
+        return jsonify(result), 200
 
     except ValidationError as e:
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
             400,
         )
 
@@ -106,7 +150,7 @@ def get_recipes():
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -120,13 +164,16 @@ def get_recipe(recipe_id):
         user_id = int(get_jwt_identity())
 
         # Get recipe
-        result = recipe_service.get_recipe(recipe_id, user_id)
+        from src.core.database import get_db_session
+
+        session = get_db_session()
+        result = recipe_service.get_recipe(session, recipe_id, user_id)
 
         return jsonify(result), 200
 
-    except NotFoundError as e:
+    except ResourceNotFoundError as e:
         return (
-            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).model_dump()),
             404,
         )
 
@@ -137,7 +184,7 @@ def get_recipe(recipe_id):
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -150,9 +197,35 @@ def update_recipe(recipe_id):
     try:
         user_id = int(get_jwt_identity())
 
-        # Validate request data
+        # Get and validate request data
         try:
-            recipe_data = RecipeUpdate(**request.get_json())
+            request_data = request.get_json()
+        except (json.JSONDecodeError, TypeError, Exception):
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Invalid JSON data",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        if request_data is None:
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Request body is required",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        try:
+            recipe_data = RecipeUpdate(**request_data)
         except PydanticValidationError as e:
             return (
                 jsonify(
@@ -161,25 +234,28 @@ def update_recipe(recipe_id):
                         message="Invalid input data",
                         status_code=400,
                         details=e.errors(),
-                    ).dict()
+                    ).model_dump()
                 ),
                 400,
             )
 
         # Update recipe
-        result = recipe_service.update_recipe(recipe_id, recipe_data, user_id)
+        from src.core.database import get_db_session
+
+        session = get_db_session()
+        result = recipe_service.update_recipe(session, recipe_id, recipe_data, user_id)
 
         return jsonify(result), 200
 
-    except NotFoundError as e:
+    except ResourceNotFoundError as e:
         return (
-            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).model_dump()),
             404,
         )
 
     except ValidationError as e:
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
             400,
         )
 
@@ -190,7 +266,7 @@ def update_recipe(recipe_id):
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -204,19 +280,16 @@ def delete_recipe(recipe_id):
         user_id = int(get_jwt_identity())
 
         # Delete recipe
-        success = recipe_service.delete_recipe(recipe_id, user_id)
+        from src.core.database import get_db_session
 
-        if success:
-            return jsonify({"message": "Recipe deleted successfully"}), 200
-        else:
-            return (
-                jsonify(ErrorResponse(error="Not Found", message="Recipe not found", status_code=404).dict()),
-                404,
-            )
+        session = get_db_session()
+        result = recipe_service.delete_recipe(session, recipe_id, user_id)
 
-    except NotFoundError as e:
+        return jsonify(result), 200
+
+    except ResourceNotFoundError as e:
         return (
-            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).dict()),
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).model_dump()),
             404,
         )
 
@@ -227,7 +300,92 @@ def delete_recipe(recipe_id):
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
+            ),
+            500,
+        )
+
+
+@recipe_bp.route("/search", methods=["GET"])
+@jwt_required()
+def search_recipes():
+    """Search recipes with filters."""
+    try:
+        user_id = int(get_jwt_identity())
+
+        # Get query parameters
+        query_params = request.args.to_dict()
+
+        # Validate query parameters
+        if "difficulty" in query_params:
+            valid_difficulties = ["easy", "medium", "hard"]
+            if query_params["difficulty"] not in valid_difficulties:
+                return (
+                    jsonify(
+                        ErrorResponse(
+                            error="Validation Error",
+                            message="Difficulty must be one of: easy, medium, hard",
+                            status_code=400,
+                        ).model_dump()
+                    ),
+                    400,
+                )
+
+        if "prep_time_max" in query_params:
+            try:
+                prep_time = int(query_params["prep_time_max"])
+                if prep_time < 0:
+                    return (
+                        jsonify(
+                            ErrorResponse(
+                                error="Validation Error",
+                                message="Prep time must be non-negative",
+                                status_code=400,
+                            ).model_dump()
+                        ),
+                        400,
+                    )
+            except ValueError:
+                return (
+                    jsonify(
+                        ErrorResponse(
+                            error="Validation Error",
+                            message="Prep time must be a valid number",
+                            status_code=400,
+                        ).model_dump()
+                    ),
+                    400,
+                )
+
+        # Get database session
+        from src.core.database import get_db_session
+
+        session = get_db_session()
+
+        # Search recipes
+        result = recipe_service.search_recipes(session, user_id, query_params)
+
+        return jsonify(result), 200
+
+    except ValidationError as e:
+        return (
+            jsonify(
+                ErrorResponse(
+                    error="Validation Error",
+                    message=e.message,
+                    status_code=400,
+                ).model_dump()
+            ),
+            400,
+        )
+    except Exception:
+        return (
+            jsonify(
+                ErrorResponse(
+                    error="Internal Server Error",
+                    message="An unexpected error occurred",
+                    status_code=500,
+                ).model_dump()
             ),
             500,
         )

@@ -1,11 +1,14 @@
 """Authentication routes for user registration and login."""
 
+import json
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from pydantic import ValidationError as PydanticValidationError
+from werkzeug.exceptions import BadRequest
 
-from src.core.exceptions import AuthenticationError, ConflictError, ValidationError
-from src.schemas.auth_schema import ErrorResponse, LoginResponse, RegisterResponse
+from src.core.exceptions import AuthenticationError, ConflictError, ResourceNotFoundError, ValidationError
+from src.schemas.auth_schema import AuthResponse, ErrorResponse
 from src.schemas.user_schema import UserCreate, UserLogin
 from src.services.authentication.auth_service import AuthService
 
@@ -20,9 +23,36 @@ auth_service = AuthService()
 def register():
     """Register a new user."""
     try:
+        # Get request data
+        try:
+            request_data = request.get_json()
+        except (json.JSONDecodeError, TypeError, Exception):
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Invalid JSON data",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        if request_data is None:
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Request body is required",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
         # Validate request data
         try:
-            user_data = UserCreate(**request.get_json())
+            user_data = UserCreate(**request_data)
         except PydanticValidationError as e:
             return (
                 jsonify(
@@ -31,7 +61,7 @@ def register():
                         message="Invalid input data",
                         status_code=400,
                         details=e.errors(),
-                    ).dict()
+                    ).model_dump()
                 ),
                 400,
             )
@@ -42,23 +72,42 @@ def register():
         # Generate JWT token
         token = create_access_token(identity=str(result["user"]["id"]))
 
-        response = RegisterResponse(
+        response = AuthResponse(
             message=result["message"],
             user=result["user"],
             token={"access_token": token, "token_type": "bearer", "expires_in": 3600},
         )
 
-        return jsonify(response.dict()), 201
+        return jsonify(response.model_dump()), 201
 
     except ConflictError as e:
         return (
-            jsonify(ErrorResponse(error="Conflict", message=str(e), status_code=409).dict()),
-            409,
+            jsonify(
+                ErrorResponse(
+                    error=e.error_code,
+                    message=str(e),
+                    status_code=e.status_code,
+                    details=e.details,
+                ).model_dump()
+            ),
+            e.status_code,
         )
 
     except ValidationError as e:
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
+            400,
+        )
+
+    except BadRequest:
+        return (
+            jsonify(
+                ErrorResponse(
+                    error="Validation Error",
+                    message="Invalid JSON data",
+                    status_code=400,
+                ).model_dump()
+            ),
             400,
         )
 
@@ -69,7 +118,7 @@ def register():
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -79,9 +128,36 @@ def register():
 def login():
     """Login user and return JWT token."""
     try:
+        # Get request data
+        try:
+            request_data = request.get_json()
+        except (json.JSONDecodeError, TypeError, Exception):
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Invalid JSON data",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
+        if request_data is None:
+            return (
+                jsonify(
+                    ErrorResponse(
+                        error="Validation Error",
+                        message="Request body is required",
+                        status_code=400,
+                    ).model_dump()
+                ),
+                400,
+            )
+
         # Validate request data
         try:
-            login_data = UserLogin(**request.get_json())
+            login_data = UserLogin(**request_data)
         except PydanticValidationError as e:
             return (
                 jsonify(
@@ -90,7 +166,7 @@ def login():
                         message="Invalid input data",
                         status_code=400,
                         details=e.errors(),
-                    ).dict()
+                    ).model_dump()
                 ),
                 400,
             )
@@ -101,23 +177,42 @@ def login():
         # Generate JWT token
         token = create_access_token(identity=str(result["user"]["id"]))
 
-        response = LoginResponse(
+        response = AuthResponse(
             message=result["message"],
             user=result["user"],
             token={"access_token": token, "token_type": "bearer", "expires_in": 3600},
         )
 
-        return jsonify(response.dict()), 200
+        return jsonify(response.model_dump()), 200
 
     except AuthenticationError as e:
         return (
-            jsonify(ErrorResponse(error="Authentication Error", message=str(e), status_code=401).dict()),
-            401,
+            jsonify(
+                ErrorResponse(
+                    error=e.error_code,
+                    message=str(e),
+                    status_code=e.status_code,
+                    details=e.details,
+                ).model_dump()
+            ),
+            e.status_code,
         )
 
     except ValidationError as e:
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).dict()),
+            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
+            400,
+        )
+
+    except BadRequest:
+        return (
+            jsonify(
+                ErrorResponse(
+                    error="Validation Error",
+                    message="Invalid JSON data",
+                    status_code=400,
+                ).model_dump()
+            ),
             400,
         )
 
@@ -128,7 +223,7 @@ def login():
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )
@@ -141,28 +236,15 @@ def get_current_user():
     try:
         user_id = int(get_jwt_identity())
 
-        # Get user data from database
-        from src.core.database import get_db_session
-        from src.repositories.user_repository import UserRepository
+        # Get user data using auth service
+        result = auth_service.get_current_user(user_id)
 
-        session = get_db_session()
-        user_repo = UserRepository()
-        user = user_repo.get_by_id(session, user_id)
+        return jsonify(result), 200
 
-        if not user:
-            return (
-                jsonify(ErrorResponse(error="Not Found", message="User not found", status_code=404).dict()),
-                404,
-            )
-
+    except ResourceNotFoundError as e:
         return (
-            jsonify(
-                {
-                    "user": user.to_dict(),
-                    "message": "User information retrieved successfully",
-                }
-            ),
-            200,
+            jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).model_dump()),
+            404,
         )
 
     except ValueError:
@@ -172,7 +254,7 @@ def get_current_user():
                     error="Invalid Token",
                     message="Invalid user ID in token",
                     status_code=401,
-                ).dict()
+                ).model_dump()
             ),
             401,
         )
@@ -184,7 +266,7 @@ def get_current_user():
                     error="Internal Server Error",
                     message="An unexpected error occurred",
                     status_code=500,
-                ).dict()
+                ).model_dump()
             ),
             500,
         )

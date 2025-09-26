@@ -1,6 +1,6 @@
 """Authentication schemas for login/register responses."""
 
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel
 
@@ -13,20 +13,17 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
-class LoginResponse(BaseModel):
-    """Schema for successful login response."""
+class AuthResponse(BaseModel):
+    """Schema for successful authentication response (login/register)."""
 
     message: str
     user: dict
     token: TokenResponse
 
 
-class RegisterResponse(BaseModel):
-    """Schema for successful registration response."""
-
-    message: str
-    user: dict
-    token: TokenResponse
+# Legacy aliases for backward compatibility
+LoginResponse = AuthResponse
+RegisterResponse = AuthResponse
 
 
 class ErrorResponse(BaseModel):
@@ -35,4 +32,4 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     status_code: int
-    details: Optional[dict] = None
+    details: Optional[Union[dict, list]] = None

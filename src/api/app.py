@@ -3,19 +3,13 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_jwt_extended.exceptions import JWTExtendedException
 
 from src.api.routes.auth_routes import auth_bp
 from src.api.routes.health_routes import health_bp
 from src.api.routes.recipe_routes import recipe_bp
-from src.core.database import db, init_database
-from src.core.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    ConflictError,
-    NotFoundError,
-    RecipeManagerException,
-    ValidationError,
-)
+from src.core.database import init_database
+from src.core.error_handler import register_exception_handlers
 from src.core.settings import settings
 
 
@@ -30,128 +24,75 @@ def create_app() -> Flask:
 
     # Initialize extensions
     CORS(app)
-    JWTManager(app)
+    jwt = JWTManager(app)
     init_database(app)
+
+    # Configure JWT error handlers
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return (
+            jsonify(
+                {
+                    "error": "AUTHENTICATION_ERROR",
+                    "message": "Token has expired",
+                    "status_code": 401,
+                }
+            ),
+            401,
+        )
+
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        return (
+            jsonify(
+                {
+                    "error": "AUTHENTICATION_ERROR",
+                    "message": "Invalid token",
+                    "status_code": 401,
+                }
+            ),
+            401,
+        )
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        return (
+            jsonify(
+                {
+                    "error": "AUTHENTICATION_ERROR",
+                    "message": "Authorization token required",
+                    "status_code": 401,
+                }
+            ),
+            401,
+        )
 
     # Register blueprints
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(recipe_bp)
 
-    # Error handlers
-    @app.errorhandler(ValidationError)
-    def handle_validation_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Validation Error",
-                    "message": e.message,
-                    "status_code": e.status_code,
-                    "field": getattr(e, "field", None),
-                }
-            ),
-            e.status_code,
-        )
+    # Register centralized error handlers
+    register_exception_handlers(app)
 
-    @app.errorhandler(AuthenticationError)
-    def handle_authentication_error(e):
+    # Custom JWT error handlers
+    @app.errorhandler(JWTExtendedException)
+    def handle_jwt_exceptions(e):
         return (
             jsonify(
                 {
-                    "error": "Authentication Error",
-                    "message": e.message,
-                    "status_code": e.status_code,
+                    "error": "AUTHENTICATION_ERROR",
+                    "message": "Invalid or expired token",
+                    "status_code": 401,
                 }
             ),
-            e.status_code,
-        )
-
-    @app.errorhandler(AuthorizationError)
-    def handle_authorization_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Authorization Error",
-                    "message": e.message,
-                    "status_code": e.status_code,
-                }
-            ),
-            e.status_code,
-        )
-
-    @app.errorhandler(NotFoundError)
-    def handle_not_found_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Not Found",
-                    "message": e.message,
-                    "status_code": e.status_code,
-                }
-            ),
-            e.status_code,
-        )
-
-    @app.errorhandler(ConflictError)
-    def handle_conflict_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Conflict",
-                    "message": e.message,
-                    "status_code": e.status_code,
-                }
-            ),
-            e.status_code,
-        )
-
-    @app.errorhandler(RecipeManagerException)
-    def handle_recipe_manager_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Recipe Manager Error",
-                    "message": e.message,
-                    "status_code": e.status_code,
-                }
-            ),
-            e.status_code,
-        )
-
-    @app.errorhandler(404)
-    def handle_not_found(e):
-        return (
-            jsonify(
-                {
-                    "error": "Not Found",
-                    "message": "The requested resource was not found",
-                    "status_code": 404,
-                }
-            ),
-            404,
-        )
-
-    @app.errorhandler(500)
-    def handle_internal_error(e):
-        return (
-            jsonify(
-                {
-                    "error": "Internal Server Error",
-                    "message": "An unexpected error occurred",
-                    "status_code": 500,
-                }
-            ),
-            500,
+            401,
         )
 
     # Root endpoint
     @app.route("/")
     def root():
         return jsonify({"message": "Recipe Manager API", "version": "1.0.0", "status": "running"})
-
-    # Create database tables
-    with app.app_context():
-        db.create_all()
 
     return app
 
