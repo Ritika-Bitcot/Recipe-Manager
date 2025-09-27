@@ -78,14 +78,64 @@ class StructuredFormatter(logging.Formatter):
 
 
 class DevelopmentFormatter(logging.Formatter):
-    """Human-readable formatter for development."""
+    """Human-readable formatter for development with key-value pairs."""
 
     def __init__(self, fmt=None, datefmt=None):
         if fmt is None:
-            fmt = "%(asctime)s | %(levelname)-8s | %(name)s.%(module)s:%(lineno)d | " "%(message)s"
+            fmt = "[%(levelname)s] %(message)s"
         if datefmt is None:
             datefmt = "%Y-%m-%d %H:%M:%S"
         super().__init__(fmt=fmt, datefmt=datefmt)
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record with key-value pairs."""
+        # Get the base message
+        message = record.getMessage()
+
+        # Extract extra fields for key-value pairs
+        extra_fields = []
+        for key, value in record.__dict__.items():
+            if key not in {
+                "name",
+                "msg",
+                "args",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "getMessage",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "message",
+            }:
+                extra_fields.append(f"{key}={value}")
+
+        # Add standard fields
+        extra_fields.extend(
+            [
+                f"filename=src/{record.module}.py",
+                f"lineno={record.lineno}",
+                f"funcName={record.funcName}",
+            ]
+        )
+
+        # Combine message with key-value pairs
+        if extra_fields:
+            kv_pairs = " ".join(extra_fields)
+            return f"[{record.levelname}] {message} {kv_pairs}"
+        else:
+            return f"[{record.levelname}] {message}"
 
 
 class RequestFormatter(logging.Formatter):

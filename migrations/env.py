@@ -9,7 +9,7 @@ from sqlalchemy import engine_from_config, pool
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Import our models and database
-from src.core.database import db
+from src.core.database import db  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

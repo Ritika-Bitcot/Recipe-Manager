@@ -319,9 +319,16 @@ class TestConfigValidation:
             "SECRET_KEY": "valid-secret-key",
             "ALLOWED_ORIGINS": '["*"]',
             "ENVIRONMENT": "test",
+            # Explicitly set database components to test defaults
+            "DB_HOST": "localhost",
+            "DB_PORT": "5432",
+            "DB_NAME": "recipe_db",
+            "DB_USER": "postgres",
+            "DB_PASSWORD": "password",
+            "DB_DRIVER": "postgresql+psycopg2",
         }
 
-        with patch.dict(os.environ, env_vars):
+        with patch.dict(os.environ, env_vars, clear=True):
             settings = Settings()
 
             # Test default values
@@ -335,15 +342,43 @@ class TestConfigValidation:
             assert settings.CACHE_TTL == 300
             assert settings.ENABLE_CACHE is True
 
+            # Test individual database component defaults
+            assert settings.DB_HOST == "localhost"
+            assert settings.DB_PORT == 5432
+            assert settings.DB_NAME == "recipe_db"
+            assert settings.DB_USER == "postgres"
+            assert settings.DB_PASSWORD == "password"
+            assert settings.DB_DRIVER == "postgresql+psycopg2"
+
     def test_missing_required_fields(self):
         """Test validation with missing required fields."""
-        # Test missing DATABASE_URL - this should use default values
-        with patch.dict(os.environ, {}, clear=True):
+        # Test missing required fields - this should use default values
+        env_vars = {
+            "SECRET_KEY": "valid-secret-key",
+            "ALLOWED_ORIGINS": '["*"]',
+            "ENVIRONMENT": "test",
+            # Explicitly set database components to test defaults
+            "DB_HOST": "localhost",
+            "DB_PORT": "5432",
+            "DB_NAME": "recipe_db",
+            "DB_USER": "postgres",
+            "DB_PASSWORD": "password",
+            "DB_DRIVER": "postgresql+psycopg2",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
             # Settings should still work with default values
             settings = Settings()
             # Check that it uses the default values from the actual config
-            assert settings.DATABASE_URL is not None
+            assert settings.database_url is not None  # This uses computed field
             assert settings.SECRET_KEY is not None
+            # Test individual database components have defaults
+            assert settings.DB_HOST == "localhost"
+            assert settings.DB_PORT == 5432
+            assert settings.DB_NAME == "recipe_db"
+            assert settings.DB_USER == "postgres"
+            assert settings.DB_PASSWORD == "password"
+            assert settings.DB_DRIVER == "postgresql+psycopg2"
 
     def test_numeric_validation(self):
         """Test numeric field validation."""

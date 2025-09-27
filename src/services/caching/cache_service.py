@@ -6,7 +6,7 @@ from functools import wraps
 from typing import Any, Optional
 
 from src.core.config import Settings
-from src.core.logging_config import get_logger, log_cache_operation
+from src.core.structured_logging import get_logger, log_cache_operation
 
 logger = get_logger(__name__)
 settings = Settings()
@@ -144,7 +144,7 @@ class CacheService:
                 operation="get",
                 key=key,
                 hit=hit,
-                duration=duration,
+                duration_ms=round(duration * 1000, 2),
             )
 
             if cache_entry:
@@ -211,7 +211,7 @@ class CacheService:
                 operation="set",
                 key=key,
                 hit=False,  # Set operations are not hits
-                duration=duration,
+                duration_ms=round(duration * 1000, 2),
                 ttl=ttl,
                 is_update=is_update,
             )
@@ -255,11 +255,22 @@ class CacheService:
             result = session.query(self.cache_table).filter(self.cache_table.cache_key == key).delete()
 
             session.commit()
-            logger.debug(f"Cache delete for key: {key}")
+            log_cache_operation(
+                logger=logger,
+                operation="delete",
+                key=key,
+                hit=False,
+                deleted_count=result,
+            )
             return bool(result)
 
         except Exception as e:
-            logger.error(f"Cache error deleting key {key}: {e}")
+            logger.error(
+                "Cache delete operation failed",
+                operation="delete",
+                key=key,
+                error=str(e),
+            )
             if "session" in locals():
                 session.rollback()
             return False

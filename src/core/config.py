@@ -1,15 +1,23 @@
 # src/core/config.py
 import json
-from typing import List
+from typing import List, Optional
 
-from pydantic import field_validator
+from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    DATABASE_URL: str
+    # Database Configuration - Support both individual components and full URL
+    DATABASE_URL: Optional[str] = None
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_NAME: str = "recipe_db"
+    DB_USER: str = "postgres"
+    DB_PASSWORD: str = "password"
+    DB_DRIVER: str = "postgresql+psycopg2"
+
     SECRET_KEY: str
     ALLOWED_ORIGINS: List[str]
     ENVIRONMENT: str
@@ -27,9 +35,21 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
-    @field_validator("DATABASE_URL")
+    @computed_field
+    @property
+    def database_url(self) -> str:
+        """Construct DATABASE_URL from individual components if not provided directly."""
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+
+        # Construct URL from individual components
+        return f"{self.DB_DRIVER}://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+    @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def validate_database_url(cls, v):
+        if v is None:
+            return None
         if not v.startswith(("postgresql://", "postgresql+psycopg2://", "sqlite://")):
             raise ValueError("DATABASE_URL must use postgresql://, postgresql+psycopg2://, " "or sqlite:// format")
         return v

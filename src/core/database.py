@@ -11,7 +11,7 @@ db = SQLAlchemy()
 
 def init_database(app: Flask) -> None:
     """Initialize database with Flask app."""
-    app.config["SQLALCHEMY_DATABASE_URI"] = settings.DATABASE_URL
+    app.config["SQLALCHEMY_DATABASE_URI"] = settings.database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
         "pool_pre_ping": True,

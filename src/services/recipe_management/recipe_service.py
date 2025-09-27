@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from src.core.database import get_db_session
 from src.core.exceptions import ResourceNotFoundError, UnauthorizedError
-from src.core.logging_config import get_logger, log_business_operation
+from src.core.structured_logging import get_logger, log_business_operation
 from src.interfaces.repository.recipe_repository_interface import RecipeRepositoryInterface
 from src.interfaces.service.recipe_service_interface import RecipeServiceInterface
 from src.repositories.recipe_repository import RecipeRepository
@@ -77,10 +77,10 @@ class RecipeService(RecipeServiceInterface):
             log_business_operation(
                 logger=logger,
                 operation="create_recipe",
-                user_id=str(user_id),
                 success=True,
-                recipe_id=recipe.id,
                 duration_ms=round(duration * 1000, 2),
+                user_id=str(user_id),
+                recipe_id=recipe.id,
             )
 
             return {

@@ -315,7 +315,7 @@ class TestPasswordHelper:
         assert result is True
 
     def test_hash_password_very_long(self, password_helper):
-        """Test hashing very long password."""
+        """Test hashing very long password (truncated to bcrypt limit)."""
         # Setup
         password = "a" * 1000  # Very long password
 
@@ -324,6 +324,7 @@ class TestPasswordHelper:
         result = password_helper.verify_password(password, hashed)
 
         # Assert
+        # bcrypt truncates passwords to 72 bytes, so this should still work
         assert result is True
 
     def test_hash_password_special_characters(self, password_helper):

@@ -1,9 +1,6 @@
 """Flask application factory for the Recipe Manager API."""
 
-import time
-import uuid
-
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended.exceptions import JWTExtendedException
@@ -13,23 +10,26 @@ from src.api.routes.health_routes import health_bp
 from src.api.routes.recipe_routes import recipe_bp
 from src.core.database import init_database
 from src.core.error_handler import register_exception_handlers
-from src.core.logging_config import get_logger, log_request_response, setup_logging
+from src.core.middleware import create_error_handler, setup_logging_middleware
 from src.core.settings import settings
+from src.core.structured_logging import get_logger, setup_structured_logging
 
 
 def create_app() -> Flask:
     """Create and configure Flask application."""
     # Set up structured logging first
-    setup_logging(settings)
+    setup_structured_logging(
+        log_level=settings.LOG_LEVEL,
+        environment=settings.ENVIRONMENT,
+        log_file=settings.LOG_FILE,
+    )
     logger = get_logger(__name__)
 
     logger.info(
         "Starting Recipe Manager API application",
-        extra={
-            "environment": settings.ENVIRONMENT,
-            "log_level": settings.LOG_LEVEL,
-            "logger_type": settings.LOGGER_TYPE,
-        },
+        environment=settings.ENVIRONMENT,
+        log_level=settings.LOG_LEVEL,
+        logger_type=settings.LOGGER_TYPE,
     )
 
     app = Flask(__name__)
@@ -44,60 +44,11 @@ def create_app() -> Flask:
     jwt = JWTManager(app)
     init_database(app)
 
-    # Set up request logging middleware
-    @app.before_request
-    def before_request():
-        """Log incoming requests."""
-        request.start_time = time.time()
-        request.request_id = str(uuid.uuid4())
+    # Set up structured logging middleware
+    setup_logging_middleware(app, exclude_paths=["/health", "/health/ready"])
 
-        # Get user ID from JWT if available
-        user_id = None
-        try:
-            from flask_jwt_extended import get_jwt_identity
-
-            user_id = get_jwt_identity()
-        except Exception:
-            pass
-
-        logger.info(
-            "Incoming request",
-            extra={
-                "request_id": request.request_id,
-                "method": request.method,
-                "url": request.url,
-                "user_agent": request.headers.get("User-Agent"),
-                "user_id": user_id,
-                "remote_addr": request.remote_addr,
-            },
-        )
-
-    @app.after_request
-    def after_request(response):
-        """Log outgoing responses."""
-        if hasattr(request, "start_time") and hasattr(request, "request_id"):
-            response_time = time.time() - request.start_time
-
-            # Get user ID from JWT if available
-            user_id = None
-            try:
-                from flask_jwt_extended import get_jwt_identity
-
-                user_id = get_jwt_identity()
-            except Exception:
-                pass
-
-            log_request_response(
-                logger=logger,
-                method=request.method,
-                url=request.url,
-                status_code=response.status_code,
-                response_time=response_time,
-                request_id=request.request_id,
-                user_id=user_id,
-            )
-
-        return response
+    # Set up error handlers
+    create_error_handler(app)
 
     # Configure JWT error handlers
     @jwt.expired_token_loader
