@@ -4,9 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [1.1.0] - 2025-01-27
 
-### 🔧 **Pull Request: feat/step3 → develop**
+### 🔧 **Pull Request: feat/step3 → dev**
 
-**Note**: This PR merges the complete Recipe Manager implementation into an empty develop branch, establishing the foundation for the project.
+**Note**: This PR merges the complete Recipe Manager implementation into an empty dev branch, establishing the foundation for the project.
 
 #### 🚀 **Structured Logging System**
 - **Dynamic Log Level Filtering** - Environment-based log level configuration (DEBUG, INFO, WARNING, ERROR, CRITICAL)
