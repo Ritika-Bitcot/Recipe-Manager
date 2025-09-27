@@ -1,13 +1,14 @@
 """SQLAlchemy-based caching service."""
 
-import logging
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Any, Optional
 
 from src.core.config import Settings
+from src.core.logging_config import get_logger, log_cache_operation
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 settings = Settings()
 
 
@@ -110,6 +111,8 @@ class CacheService:
 
     def get(self, key: str) -> Optional[Any]:
         """Get value from cache."""
+        start_time = time.time()
+
         if not self.enabled:
             return None
 
@@ -133,15 +136,33 @@ class CacheService:
                 .first()
             )
 
+            hit = cache_entry is not None
+            duration = time.time() - start_time
+
+            log_cache_operation(
+                logger=logger,
+                operation="get",
+                key=key,
+                hit=hit,
+                duration=duration,
+            )
+
             if cache_entry:
-                logger.debug(f"Cache hit for key: {key}")
                 return self._deserialize(cache_entry.cache_value)
 
-            logger.debug(f"Cache miss for key: {key}")
             return None
 
         except Exception as e:
-            logger.error(f"Cache error getting key {key}: {e}")
+            duration = time.time() - start_time
+            logger.error(
+                "Cache get operation failed",
+                extra={
+                    "operation": "get",
+                    "key": key,
+                    "error": str(e),
+                    "duration_ms": round(duration * 1000, 2),
+                },
+            )
             return None
         finally:
             if "session" in locals():
@@ -149,6 +170,8 @@ class CacheService:
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """Set value in cache."""
+        start_time = time.time()
+
         if not self.enabled:
             return False
 
@@ -169,6 +192,8 @@ class CacheService:
             # Check if key exists
             existing_entry = session.query(self.cache_table).filter(self.cache_table.cache_key == key).first()
 
+            is_update = existing_entry is not None
+
             if existing_entry:
                 # Update existing entry
                 existing_entry.cache_value = serialized_value
@@ -179,11 +204,32 @@ class CacheService:
                 session.add(cache_entry)
 
             session.commit()
-            logger.debug(f"Cache set for key: {key} (TTL: {ttl}s)")
+
+            duration = time.time() - start_time
+            log_cache_operation(
+                logger=logger,
+                operation="set",
+                key=key,
+                hit=False,  # Set operations are not hits
+                duration=duration,
+                ttl=ttl,
+                is_update=is_update,
+            )
+
             return True
 
         except Exception as e:
-            logger.error(f"Cache error setting key {key}: {e}")
+            duration = time.time() - start_time
+            logger.error(
+                "Cache set operation failed",
+                extra={
+                    "operation": "set",
+                    "key": key,
+                    "error": str(e),
+                    "duration_ms": round(duration * 1000, 2),
+                    "ttl": ttl,
+                },
+            )
             if "session" in locals():
                 session.rollback()
             return False

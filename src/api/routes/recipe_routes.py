@@ -135,7 +135,7 @@ def create_recipe():
 
         session = get_db_session()
         result = recipe_service.create_recipe(session, recipe_data, user_id)
-        logger.info(f"Successfully created recipe {result.get('id', 'unknown')} for user {user_id}")
+        logger.info(f"Successfully created recipe {result.get('id', 'unknown')} " f"for user {user_id}")
 
         return jsonify(result), 201
 

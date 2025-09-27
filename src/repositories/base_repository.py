@@ -39,7 +39,9 @@ class BaseRepository(BaseRepositoryInterface[T]):
             session.add(db_obj)
             session.commit()
             session.refresh(db_obj)
-            logger.info(f"Successfully created {self.model_class.__name__} with ID: {getattr(db_obj, 'id', 'unknown')}")
+            logger.info(
+                f"Successfully created {self.model_class.__name__} with ID: " f"{getattr(db_obj, 'id', 'unknown')}"
+            )
             return db_obj
         except SQLAlchemyError as e:
             session.rollback()
@@ -77,7 +79,7 @@ class BaseRepository(BaseRepositoryInterface[T]):
         Returns:
             List of record instances
         """
-        logger.debug(f"Retrieving {self.model_class.__name__} records (skip={skip}, limit={limit})")
+        logger.debug(f"Retrieving {self.model_class.__name__} records " f"(skip={skip}, limit={limit})")
         results = session.query(self.model_class).offset(skip).limit(limit).all()
         logger.debug(f"Retrieved {len(results)} {self.model_class.__name__} records")
         return results
@@ -115,7 +117,7 @@ class BaseRepository(BaseRepositoryInterface[T]):
             session.commit()
             session.refresh(db_obj)
             logger.info(
-                f"Successfully updated {self.model_class.__name__} with ID: {id}. Changes: {', '.join(changes)}"
+                f"Successfully updated {self.model_class.__name__} with ID: {id}. " f"Changes: {', '.join(changes)}"
             )
             return db_obj
         except SQLAlchemyError as e:

@@ -1,11 +1,12 @@
 """Recipe service implementation with caching and multi-tenancy."""
 
-import logging
 import math
+import time
 from typing import Any, Dict, Optional
 
 from src.core.database import get_db_session
 from src.core.exceptions import ResourceNotFoundError, UnauthorizedError
+from src.core.logging_config import get_logger, log_business_operation
 from src.interfaces.repository.recipe_repository_interface import RecipeRepositoryInterface
 from src.interfaces.service.recipe_service_interface import RecipeServiceInterface
 from src.repositories.recipe_repository import RecipeRepository
@@ -14,7 +15,7 @@ from src.services.caching.cache_service import cache_key, cache_service, invalid
 from src.validators.query_validators import validate_pagination_params, validate_search_params
 from src.validators.recipe_validator import validate_recipe_data
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RecipeService(RecipeServiceInterface):
@@ -26,6 +27,7 @@ class RecipeService(RecipeServiceInterface):
     @invalidate_cache("recipe:*")
     def create_recipe(self, db_session, recipe_data, user_id: int) -> Dict[str, Any]:
         """Create a new recipe for a user."""
+        start_time = time.time()
         session = db_session
 
         try:
@@ -71,7 +73,15 @@ class RecipeService(RecipeServiceInterface):
             # Create recipe
             recipe = self.recipe_repository.create(session, recipe_dict)
 
-            logger.info(f"Recipe {recipe.id} created for user {user_id}")
+            duration = time.time() - start_time
+            log_business_operation(
+                logger=logger,
+                operation="create_recipe",
+                user_id=str(user_id),
+                success=True,
+                recipe_id=recipe.id,
+                duration_ms=round(duration * 1000, 2),
+            )
 
             return {
                 "recipe": recipe.to_dict(),
@@ -79,6 +89,15 @@ class RecipeService(RecipeServiceInterface):
             }
 
         except Exception as e:
+            duration = time.time() - start_time
+            log_business_operation(
+                logger=logger,
+                operation="create_recipe",
+                user_id=str(user_id),
+                success=False,
+                error=str(e),
+                duration_ms=round(duration * 1000, 2),
+            )
             session.rollback()
             raise e
 

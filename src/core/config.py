@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v):
         if not v.startswith(("postgresql://", "postgresql+psycopg2://", "sqlite://")):
-            raise ValueError("DATABASE_URL must use postgresql://, postgresql+psycopg2://, or sqlite:// format")
+            raise ValueError("DATABASE_URL must use postgresql://, postgresql+psycopg2://, " "or sqlite:// format")
         return v
 
     @field_validator("SECRET_KEY")
