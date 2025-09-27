@@ -20,12 +20,18 @@ def validate_password(password: str) -> str:
     if not password:
         raise ValidationError("Password is required", "password")
 
-    # Length validation
+    # Length validation with clear error messages
     if len(password) < 8:
-        raise ValidationError("Password must be at least 8 characters long", "password")
+        raise ValidationError(
+            "Password must be at least 8 characters long. Current length: {len(password)} characters",
+            "password",
+        )
 
     if len(password) > 128:
-        raise ValidationError("Password must be less than 128 characters", "password")
+        raise ValidationError(
+            "Password must be less than 128 characters. Current length: {len(password)} characters",
+            "password",
+        )
 
     # Check for common weak passwords first (before other validations)
     weak_passwords = [
@@ -42,14 +48,17 @@ def validate_password(password: str) -> str:
     ]
 
     if password.lower() in weak_passwords:
-        raise ValidationError("Password is too common, please choose a stronger password", "password")
+        raise ValidationError(
+            "Password is too common and easily guessable. Please choose a stronger, unique password",
+            "password",
+        )
 
-    # Check for at least one character and one number
+    # Check for at least one character and one number with helpful messages
     if not re.search(r"[A-Za-z]", password):
-        raise ValidationError("Password must contain at least one letter", "password")
+        raise ValidationError("Password must contain at least one letter (a-z or A-Z)", "password")
 
     if not re.search(r"\d", password):
-        raise ValidationError("Password must contain at least one number", "password")
+        raise ValidationError("Password must contain at least one number (0-9)", "password")
 
     return password
 

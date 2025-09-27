@@ -1,12 +1,13 @@
 """Recipe routes for CRUD operations."""
 
 import json
+import logging
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError as PydanticValidationError
 
-from src.core.exceptions import ResourceNotFoundError, ValidationError
+from src.core.exceptions import ResourceNotFoundError, UnauthorizedError, ValidationError
 from src.schemas.auth_schema import ErrorResponse
 from src.schemas.recipe_schema import RecipeCreate, RecipeUpdate
 from src.services.recipe_management.recipe_service import RecipeService
@@ -17,90 +18,143 @@ recipe_bp = Blueprint("recipes", __name__, url_prefix="/api/recipes")
 # Initialize service
 recipe_service = RecipeService()
 
+# Logger for route operations
+logger = logging.getLogger(__name__)
+
+
+def _handle_json_validation_error() -> tuple[dict, int]:
+    """Handle JSON validation errors consistently across routes.
+
+    Returns:
+        Tuple of (error_response, status_code)
+    """
+    return (
+        jsonify(
+            ErrorResponse(
+                error="VALIDATION_ERROR",
+                message="Invalid JSON data",
+                status_code=400,
+            ).model_dump()
+        ),
+        400,
+    )
+
+
+def _handle_empty_request_error() -> tuple[dict, int]:
+    """Handle empty request body errors consistently across routes.
+
+    Returns:
+        Tuple of (error_response, status_code)
+    """
+    return (
+        jsonify(
+            ErrorResponse(
+                error="VALIDATION_ERROR",
+                message="Request body is required",
+                status_code=400,
+            ).model_dump()
+        ),
+        400,
+    )
+
+
+def _handle_pydantic_validation_error(
+    error: PydanticValidationError,
+) -> tuple[dict, int]:
+    """Handle Pydantic validation errors consistently across routes.
+
+    Args:
+        error: Pydantic validation error
+
+    Returns:
+        Tuple of (error_response, status_code)
+    """
+    return (
+        jsonify(
+            ErrorResponse(
+                error="VALIDATION_ERROR",
+                message="Invalid input data",
+                status_code=400,
+                details=error.errors(),
+            ).model_dump()
+        ),
+        400,
+    )
+
+
+def _handle_generic_error(error: Exception, operation: str) -> tuple[dict, int]:
+    """Handle generic errors consistently across routes.
+
+    Args:
+        error: Exception that occurred
+        operation: Description of the operation that failed
+
+    Returns:
+        Tuple of (error_response, status_code)
+    """
+    logger.error(f"Error during {operation}: {str(error)}", exc_info=True)
+    return (
+        jsonify(
+            ErrorResponse(
+                error="INTERNAL_SERVER_ERROR",
+                message="An unexpected error occurred",
+                status_code=500,
+            ).model_dump()
+        ),
+        500,
+    )
+
 
 @recipe_bp.route("", methods=["POST"])
 @jwt_required()
 def create_recipe():
-    """Create a new recipe."""
+    """Create a new recipe with improved error handling and logging."""
     try:
         user_id = int(get_jwt_identity())
+        logger.info(f"Creating recipe for user {user_id}")
 
         # Get and validate request data
         try:
             request_data = request.get_json()
         except (json.JSONDecodeError, TypeError, Exception):
-            return (
-                jsonify(
-                    ErrorResponse(
-                        error="Validation Error",
-                        message="Invalid JSON data",
-                        status_code=400,
-                    ).model_dump()
-                ),
-                400,
-            )
+            logger.warning(f"Invalid JSON data received from user {user_id}")
+            return _handle_json_validation_error()
 
         if request_data is None:
-            return (
-                jsonify(
-                    ErrorResponse(
-                        error="Validation Error",
-                        message="Request body is required",
-                        status_code=400,
-                    ).model_dump()
-                ),
-                400,
-            )
+            logger.warning(f"Empty request body received from user {user_id}")
+            return _handle_empty_request_error()
 
         try:
             recipe_data = RecipeCreate(**request_data)
         except PydanticValidationError as e:
-            return (
-                jsonify(
-                    ErrorResponse(
-                        error="Validation Error",
-                        message="Invalid input data",
-                        status_code=400,
-                        details=e.errors(),
-                    ).model_dump()
-                ),
-                400,
-            )
+            logger.warning(f"Pydantic validation error for user {user_id}: {e.errors()}")
+            return _handle_pydantic_validation_error(e)
 
         # Create recipe
         from src.core.database import get_db_session
 
         session = get_db_session()
         result = recipe_service.create_recipe(session, recipe_data, user_id)
+        logger.info(f"Successfully created recipe {result.get('id', 'unknown')} for user {user_id}")
 
         return jsonify(result), 201
 
     except ValidationError as e:
+        logger.warning(f"Validation error for user {user_id}: {str(e)}")
         return (
-            jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
+            jsonify(ErrorResponse(error="VALIDATION_ERROR", message=str(e), status_code=400).model_dump()),
             400,
         )
 
-    except Exception:
-        return (
-            jsonify(
-                ErrorResponse(
-                    error="Internal Server Error",
-                    message="An unexpected error occurred",
-                    status_code=500,
-                ).model_dump()
-            ),
-            500,
-        )
+    except Exception as e:
+        return _handle_generic_error(e, f"recipe creation for user {user_id}")
 
 
 @recipe_bp.route("", methods=["GET"])
 @jwt_required()
 def get_recipes():
-    """Get all recipes for the current user."""
+    """Get all recipes (multi-tenancy read access)."""
     try:
-        user_id = int(get_jwt_identity())
-
         # Get query parameters
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 10))
@@ -129,11 +183,11 @@ def get_recipes():
                 400,
             )
 
-        # Get recipes
+        # Get all recipes
         from src.core.database import get_db_session
 
         session = get_db_session()
-        result = recipe_service.list_recipes(session, user_id, page, per_page)
+        result = recipe_service.list_recipes(session, page=page, per_page=per_page)
 
         return jsonify(result), 200
 
@@ -253,6 +307,12 @@ def update_recipe(recipe_id):
             404,
         )
 
+    except UnauthorizedError as e:
+        return (
+            jsonify(ErrorResponse(error="Unauthorized", message=str(e), status_code=403).model_dump()),
+            403,
+        )
+
     except ValidationError as e:
         return (
             jsonify(ErrorResponse(error="Validation Error", message=str(e), status_code=400).model_dump()),
@@ -291,6 +351,12 @@ def delete_recipe(recipe_id):
         return (
             jsonify(ErrorResponse(error="Not Found", message=str(e), status_code=404).model_dump()),
             404,
+        )
+
+    except UnauthorizedError as e:
+        return (
+            jsonify(ErrorResponse(error="Unauthorized", message=str(e), status_code=403).model_dump()),
+            403,
         )
 
     except Exception:

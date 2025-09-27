@@ -4,7 +4,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.core.exceptions import AuthenticationError, ConflictError, ResourceNotFoundError, ValidationError
+from src.core.exceptions import (
+    AuthenticationError,
+    ConflictError,
+    ResourceNotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
 from src.schemas.recipe_schema import RecipeCreate, RecipeUpdate
 from src.schemas.user_schema import UserCreate, UserLogin
 from src.services.authentication.auth_service import AuthService
@@ -252,10 +258,10 @@ class TestRecipeService:
         service = RecipeService()
         update_data = RecipeUpdate(**sample_recipe_data)
 
-        with patch.object(service.recipe_repository, "get_by_id", return_value=None):
-            with pytest.raises(ResourceNotFoundError) as exc_info:
+        with patch.object(service.recipe_repository, "get_by_owner_and_id", return_value=None):
+            with pytest.raises(UnauthorizedError) as exc_info:
                 service.update_recipe(db_session, 999, update_data, sample_user.id)
-            assert exc_info.value.resource_type == "Recipe"
+            assert "You can only update your own recipes" in str(exc_info.value)
 
     def test_delete_recipe_success(self, db_session, sample_recipe):
         """Test successful recipe deletion."""
@@ -274,10 +280,10 @@ class TestRecipeService:
         """Test recipe deletion with non-existent recipe."""
         service = RecipeService()
 
-        with patch.object(service.recipe_repository, "get_by_id", return_value=None):
-            with pytest.raises(ResourceNotFoundError) as exc_info:
+        with patch.object(service.recipe_repository, "get_by_owner_and_id", return_value=None):
+            with pytest.raises(UnauthorizedError) as exc_info:
                 service.delete_recipe(db_session, 999, sample_user.id)
-            assert exc_info.value.resource_type == "Recipe"
+            assert "You can only delete your own recipes" in str(exc_info.value)
 
     def test_list_recipes_success(self, db_session, sample_user):
         """Test successful recipe listing."""
@@ -286,9 +292,9 @@ class TestRecipeService:
         mock_recipes[0].to_dict.return_value = {"id": 1, "title": "Recipe 1"}
         mock_recipes[1].to_dict.return_value = {"id": 2, "title": "Recipe 2"}
 
-        with patch.object(service.recipe_repository, "get_user_recipes", return_value=mock_recipes):
-            with patch.object(service.recipe_repository, "count_user_recipes", return_value=2):
-                result = service.list_recipes(db_session, sample_user.id, page=1, per_page=10)
+        with patch.object(service.recipe_repository, "get_all", return_value=mock_recipes):
+            with patch.object(service.recipe_repository, "count_all", return_value=2):
+                result = service.list_recipes(db_session, page=1, per_page=10)
 
                 assert "recipes" in result
                 assert "pagination" in result
@@ -299,9 +305,9 @@ class TestRecipeService:
         """Test recipe listing with no recipes."""
         service = RecipeService()
 
-        with patch.object(service.recipe_repository, "get_user_recipes", return_value=[]):
-            with patch.object(service.recipe_repository, "count_user_recipes", return_value=0):
-                result = service.list_recipes(db_session, sample_user.id, page=1, per_page=10)
+        with patch.object(service.recipe_repository, "get_all", return_value=[]):
+            with patch.object(service.recipe_repository, "count_all", return_value=0):
+                result = service.list_recipes(db_session, page=1, per_page=10)
 
                 assert "recipes" in result
                 assert "pagination" in result
@@ -331,13 +337,15 @@ class TestRecipeService:
                 assert len(result["recipes"]) == 1
 
     def test_recipe_authorization(self, db_session, sample_recipe, sample_user):
-        """Test recipe authorization (user can only access their own recipes)."""
+        """Test recipe authorization (users can read all recipes but only modify their own)."""
         service = RecipeService()
         other_user_id = 999
 
         with patch.object(service.recipe_repository, "get_by_id", return_value=sample_recipe):
-            with pytest.raises(ResourceNotFoundError):
-                service.get_recipe(db_session, sample_recipe.id, other_user_id)
+            # Users can now read all recipes (multi-tenancy read access)
+            result = service.get_recipe(db_session, sample_recipe.id, other_user_id)
+            assert "recipe" in result
+            assert result["recipe"]["id"] == sample_recipe.id
 
     def test_recipe_validation_error(self, db_session, sample_user, invalid_recipe_data):
         """Test recipe creation with invalid data."""
@@ -353,9 +361,9 @@ class TestRecipeService:
         for i, recipe in enumerate(mock_recipes):
             recipe.to_dict.return_value = {"id": i + 1, "title": f"Recipe {i + 1}"}
 
-        with patch.object(service.recipe_repository, "get_user_recipes", return_value=mock_recipes):
-            with patch.object(service.recipe_repository, "count_user_recipes", return_value=25):
-                result = service.list_recipes(db_session, sample_user.id, page=2, per_page=10)
+        with patch.object(service.recipe_repository, "get_all", return_value=mock_recipes):
+            with patch.object(service.recipe_repository, "count_all", return_value=25):
+                result = service.list_recipes(db_session, page=2, per_page=10)
 
                 assert "pagination" in result
                 assert result["pagination"]["page"] == 2

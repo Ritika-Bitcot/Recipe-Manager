@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Caching Configuration
+    CACHE_TTL: int = 300  # 5 minutes default TTL
+    ENABLE_CACHE: bool = True
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @field_validator("DATABASE_URL")

@@ -1,16 +1,20 @@
-"""Recipe service implementation."""
+"""Recipe service implementation with caching and multi-tenancy."""
 
+import logging
 import math
 from typing import Any, Dict, Optional
 
 from src.core.database import get_db_session
-from src.core.exceptions import ResourceNotFoundError
+from src.core.exceptions import ResourceNotFoundError, UnauthorizedError
 from src.interfaces.repository.recipe_repository_interface import RecipeRepositoryInterface
 from src.interfaces.service.recipe_service_interface import RecipeServiceInterface
 from src.repositories.recipe_repository import RecipeRepository
 from src.schemas.recipe_schema import RecipeListResponse, RecipeUpdate
+from src.services.caching.cache_service import cache_key, cache_service, invalidate_cache
 from src.validators.query_validators import validate_pagination_params, validate_search_params
 from src.validators.recipe_validator import validate_recipe_data
+
+logger = logging.getLogger(__name__)
 
 
 class RecipeService(RecipeServiceInterface):
@@ -19,6 +23,7 @@ class RecipeService(RecipeServiceInterface):
     def __init__(self, recipe_repository: RecipeRepositoryInterface = None):
         self.recipe_repository = recipe_repository or RecipeRepository()
 
+    @invalidate_cache("recipe:*")
     def create_recipe(self, db_session, recipe_data, user_id: int) -> Dict[str, Any]:
         """Create a new recipe for a user."""
         session = db_session
@@ -66,6 +71,8 @@ class RecipeService(RecipeServiceInterface):
             # Create recipe
             recipe = self.recipe_repository.create(session, recipe_dict)
 
+            logger.info(f"Recipe {recipe.id} created for user {user_id}")
+
             return {
                 "recipe": recipe.to_dict(),
                 "message": "Recipe created successfully",
@@ -76,18 +83,32 @@ class RecipeService(RecipeServiceInterface):
             raise e
 
     def get_recipe(self, db_session, recipe_id: int, user_id: int) -> Dict[str, Any]:
-        """Get a recipe by ID for a specific user."""
+        """Get a recipe by ID with multi-tenancy support (users can read all recipes)."""
         session = db_session
 
         try:
-            recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
+            # First try to get from cache
+            cache_key_str = cache_key("recipe", recipe_id)
+            cached_result = cache_service.get(cache_key_str)
+            if cached_result:
+                logger.debug(f"Recipe {recipe_id} retrieved from cache")
+                return cached_result
+
+            # Get recipe from database (allow reading any recipe)
+            recipe = self.recipe_repository.get_by_id(session, recipe_id)
             if not recipe:
                 raise ResourceNotFoundError("Recipe", recipe_id)
 
-            return {
+            result = {
                 "recipe": recipe.to_dict(),
                 "message": "Recipe retrieved successfully",
             }
+
+            # Cache the result
+            cache_service.set(cache_key_str, result)
+            logger.info(f"Recipe {recipe_id} retrieved for user {user_id}")
+
+            return result
 
         except Exception as e:
             raise e
@@ -133,15 +154,17 @@ class RecipeService(RecipeServiceInterface):
         finally:
             session.close()
 
+    @invalidate_cache("recipe:*")
     def update_recipe(self, db_session, recipe_id: int, recipe_data: RecipeUpdate, user_id: int) -> Dict[str, Any]:
-        """Update a recipe for a specific user."""
+        """Update a recipe for a specific user (enforce ownership)."""
         session = db_session
 
         try:
-            # Check if recipe exists and belongs to user
+            # Check if recipe exists and belongs to user (enforce ownership)
             existing_recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             if not existing_recipe:
-                raise ResourceNotFoundError("Recipe", recipe_id)
+                logger.warning(f"User {user_id} attempted to update recipe {recipe_id} they don't own")
+                raise UnauthorizedError("You can only update your own recipes")
 
             # Prepare update data (only include non-None values)
             update_dict = {}
@@ -166,6 +189,8 @@ class RecipeService(RecipeServiceInterface):
             # Update recipe
             updated_recipe = self.recipe_repository.update(session, recipe_id, update_dict)
 
+            logger.info(f"Recipe {recipe_id} updated by user {user_id}")
+
             return {
                 "recipe": updated_recipe.to_dict(),
                 "message": "Recipe updated successfully",
@@ -175,18 +200,22 @@ class RecipeService(RecipeServiceInterface):
             session.rollback()
             raise e
 
+    @invalidate_cache("recipe:*")
     def delete_recipe(self, db_session, recipe_id: int, user_id: int) -> Dict[str, Any]:
-        """Delete a recipe for a specific user."""
+        """Delete a recipe for a specific user (enforce ownership)."""
         session = db_session
 
         try:
-            # Check if recipe exists and belongs to user
+            # Check if recipe exists and belongs to user (enforce ownership)
             existing_recipe = self.recipe_repository.get_by_owner_and_id(session, recipe_id, user_id)
             if not existing_recipe:
-                raise ResourceNotFoundError("Recipe", recipe_id)
+                logger.warning(f"User {user_id} attempted to delete recipe {recipe_id} they don't own")
+                raise UnauthorizedError("You can only delete your own recipes")
 
             # Delete recipe
             success = self.recipe_repository.delete(session, recipe_id)
+
+            logger.info(f"Recipe {recipe_id} deleted by user {user_id}")
 
             return {"message": "Recipe deleted successfully", "success": success}
 
@@ -207,18 +236,25 @@ class RecipeService(RecipeServiceInterface):
             session.close()
 
     # Additional sync methods expected by tests
-    def list_recipes(self, db_session, user_id: int, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
-        """List user's recipes with pagination."""
+    def list_recipes(self, db_session, user_id: int = None, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
+        """List all recipes with pagination and caching (multi-tenancy read access)."""
         session = db_session
 
         try:
+            # Try to get from cache first
+            cache_key_str = cache_key("all_recipes", page, per_page)
+            cached_result = cache_service.get(cache_key_str)
+            if cached_result:
+                logger.debug(f"All recipes page {page} retrieved from cache")
+                return cached_result
+
             skip = (page - 1) * per_page
-            recipes = self.recipe_repository.get_user_recipes(session, user_id, skip, per_page)
-            total = self.recipe_repository.count_user_recipes(session, user_id)
+            recipes = self.recipe_repository.get_all(session, skip, per_page)
+            total = self.recipe_repository.count_all(session)
 
             total_pages = math.ceil(total / per_page) if total > 0 else 1
 
-            return {
+            result = {
                 "recipes": [recipe.to_dict() for recipe in recipes],
                 "pagination": {
                     "page": page,
@@ -227,6 +263,48 @@ class RecipeService(RecipeServiceInterface):
                     "pages": total_pages,
                 },
             }
+
+            # Cache the result
+            cache_service.set(cache_key_str, result)
+            logger.info(f"All recipes page {page} retrieved")
+
+            return result
+        except Exception as e:
+            raise e
+
+    def get_all_recipes(self, db_session, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
+        """Get all recipes (multi-tenancy read access)."""
+        session = db_session
+
+        try:
+            # Try to get from cache first
+            cache_key_str = cache_key("all_recipes", page, per_page)
+            cached_result = cache_service.get(cache_key_str)
+            if cached_result:
+                logger.debug(f"All recipes page {page} retrieved from cache")
+                return cached_result
+
+            skip = (page - 1) * per_page
+            recipes = self.recipe_repository.get_all(session, skip, per_page)
+            total = self.recipe_repository.count_all(session)
+
+            total_pages = math.ceil(total / per_page) if total > 0 else 1
+
+            result = {
+                "recipes": [recipe.to_dict() for recipe in recipes],
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "pages": total_pages,
+                },
+            }
+
+            # Cache the result
+            cache_service.set(cache_key_str, result)
+            logger.info(f"All recipes page {page} retrieved")
+
+            return result
         except Exception as e:
             raise e
 

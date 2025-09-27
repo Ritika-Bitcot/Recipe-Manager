@@ -162,3 +162,4 @@ class InternalServerError(BaseAppException):
 # Legacy aliases for backward compatibility
 RecipeManagerException = BaseAppException
 NotFoundError = ResourceNotFoundError
+UnauthorizedError = AuthorizationError

@@ -206,3 +206,11 @@ class RecipeRepository(BaseRepository[Recipe], RecipeRepositoryInterface):
                     query = query.filter(Recipe.tags.contains([tag]))
 
         return query.count()
+
+    def get_all(self, session: Session, skip: int = 0, limit: int = 100) -> List[Recipe]:
+        """Get all recipes with pagination (for multi-tenancy read access)."""
+        return session.query(Recipe).offset(skip).limit(limit).all()
+
+    def count_all(self, session: Session) -> int:
+        """Count all recipes."""
+        return session.query(Recipe).count()

@@ -18,16 +18,24 @@ def create_error_response(
     status_code: int,
     details: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Create standardized error response.
+    """Create standardized error response following consistent API contract.
 
     Args:
-        error_code: Machine-readable error code
-        message: Human-readable error message
-        status_code: HTTP status code
-        details: Additional error details
+        error_code: Machine-readable error code (e.g., "VALIDATION_ERROR", "NOT_FOUND")
+        message: Human-readable error message for end users
+        status_code: HTTP status code (400, 401, 404, 500, etc.)
+        details: Additional error details (field errors, traceback, etc.)
 
     Returns:
-        Standardized error response dictionary
+        Standardized error response dictionary with consistent structure:
+        {
+            "error": {
+                "code": str,
+                "message": str,
+                "status_code": int,
+                "details": dict (optional)
+            }
+        }
     """
     response = {
         "error": {
