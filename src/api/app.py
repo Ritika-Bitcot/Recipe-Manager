@@ -10,7 +10,8 @@ from src.api.routes.health_routes import health_bp
 from src.api.routes.recipe_routes import recipe_bp
 from src.core.database import init_database
 from src.core.error_handler import register_exception_handlers
-from src.core.middleware import create_error_handler, setup_logging_middleware
+from src.core.error_handlers import create_error_handler
+from src.core.middleware import setup_logging_middleware
 from src.core.settings import settings
 from src.core.structured_logging import get_logger, setup_structured_logging
 

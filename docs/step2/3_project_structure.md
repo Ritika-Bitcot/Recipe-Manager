@@ -61,11 +61,15 @@ Recipe-Manager/
 │   │       └── health_routes.py # Health & readiness checks
 │   │
 │   ├── core/                     # Core utilities & configs
-│   │   ├── config.py            # Environment-based settings
+│   │   ├── config.py            # Environment-based settings (Pydantic)
 │   │   ├── database.py          # SQLAlchemy + Alembic setup
-│   │   ├── error_handler.py     # Centralized error handling
+│   │   ├── error_handler.py     # Custom exception handlers
+│   │   ├── error_handlers.py    # Flask error handlers (400, 401, 403, 404, 500)
 │   │   ├── exceptions.py        # Custom exceptions hierarchy
-│   │   └── settings.py          # Settings management
+│   │   ├── logging_config.py    # Logging configuration
+│   │   ├── middleware.py        # Request/response middleware
+│   │   ├── settings.py          # Legacy settings (deprecated)
+│   │   └── structured_logging.py # Structured logging utilities
 │   │
 │   ├── interfaces/               # Abstract contracts (SOLID)
 │   │   ├── repository/          # Repository interfaces
@@ -113,18 +117,24 @@ Recipe-Manager/
 │
 ├── tests/                        # Comprehensive test suite
 │   ├── conftest.py              # Test fixtures and configuration
-│   ├── test_auth_routes.py      # Authentication API tests
-│   ├── test_recipe_routes.py    # Recipe API tests
-│   ├── test_health_routes.py    # Health check tests
-│   ├── test_error_handling.py   # Error handling tests
-│   ├── test_validators.py       # Validation function tests
-│   ├── test_models.py           # ORM model tests
-│   ├── test_services.py         # Service layer tests
+│   ├── test_api_logging.py      # API logging tests
 │   ├── test_async_services.py   # Async service tests
-│   ├── test_repositories.py     # Repository pattern tests
-│   ├── test_utils.py            # Utility function tests
+│   ├── test_auth_routes.py      # Authentication API tests
+│   ├── test_caching.py          # Caching system tests
 │   ├── test_config.py           # Configuration validation tests
-│   └── test_caching.py          # Caching system tests
+│   ├── test_error_handling.py   # Error handling tests
+│   ├── test_flask_logging.py    # Flask logging tests
+│   ├── test_health_routes.py    # Health check tests
+│   ├── test_logging_demo.py     # Logging demonstration tests
+│   ├── test_log_levels.py       # Log level tests
+│   ├── test_models.py           # ORM model tests
+│   ├── test_recipe_routes.py    # Recipe API tests
+│   ├── test_repositories.py     # Repository pattern tests
+│   ├── test_services.py         # Service layer tests
+│   ├── test_simple.py           # Simple integration tests
+│   ├── test_structured_logging.py # Structured logging tests
+│   ├── test_utils.py            # Utility function tests
+│   └── test_validators.py       # Validation function tests
 │
 ├── .env.example                  # Example environment config
 ├── .gitignore                    # Git ignore rules
@@ -147,16 +157,24 @@ Recipe-Manager/
 - **`src/models/cache_model.py`**: Cache entries database model
 - **`tests/test_caching.py`**: Comprehensive caching tests
 
+### Structured Logging System
+- **`src/core/structured_logging.py`**: Advanced structured logging utilities
+- **`src/core/logging_config.py`**: Logging configuration and setup
+- **`src/core/error_handlers.py`**: Flask error handlers with structured logging
+- **`src/core/middleware.py`**: Request/response middleware with correlation tracking
+- **Logging Tests**: Comprehensive test coverage for all logging features
+
 ### Multi-tenancy
 - **Read Access**: Users can read all recipes
 - **Write Access**: Users can only modify their own recipes
 - **Security**: Comprehensive ownership validation
 
 ### Testing Infrastructure
-- **359 Tests**: Comprehensive test coverage (82%)
-- **Test Categories**: Unit, integration, repository, caching, validation
+- **368 Tests**: Comprehensive test coverage (82%)
+- **Test Categories**: Unit, integration, repository, caching, validation, logging
 - **Database Testing**: SQLite in-memory for fast, isolated testing
 - **Test Fixtures**: Reusable test data and database sessions
+- **Logging Tests**: Comprehensive structured logging validation
 
 ### Documentation
 - **Comprehensive Docs**: README, API overview, architecture, testing, deployment
