@@ -1,2 +1,27 @@
-#virtual environment
+# Virtual environment
 venv/
+
+# Environment files
+.env
+.env.development
+.env.test
+.env.production
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Log files
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
