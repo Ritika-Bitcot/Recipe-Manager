@@ -33,6 +33,17 @@ class Settings(BaseSettings):
     CACHE_TTL: int = 300  # 5 minutes default TTL
     ENABLE_CACHE: bool = True
 
+    # Authentication Bypass for Development
+    AUTH_BYPASS_EMAIL: Optional[str] = None
+
+    @field_validator("AUTH_BYPASS_EMAIL", mode="before")
+    @classmethod
+    def validate_auth_bypass_email(cls, v):
+        """Validate AUTH_BYPASS_EMAIL setting."""
+        if v is None or v == "" or v == "None" or v == "null":
+            return None
+        return v
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @computed_field

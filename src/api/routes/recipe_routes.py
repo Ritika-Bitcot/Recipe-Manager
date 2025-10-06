@@ -3,14 +3,14 @@
 import json
 import logging
 
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask import Blueprint, g, jsonify, request
 from pydantic import ValidationError as PydanticValidationError
 
 from src.core.exceptions import ResourceNotFoundError, UnauthorizedError, ValidationError
 from src.schemas.auth_schema import ErrorResponse
 from src.schemas.recipe_schema import RecipeCreate, RecipeUpdate
 from src.services.recipe_management.recipe_service import RecipeService
+from src.utils.auth_decorators import jwt_required_with_bypass
 
 # Create blueprint
 recipe_bp = Blueprint("recipes", __name__, url_prefix="/api/recipes")
@@ -106,11 +106,11 @@ def _handle_generic_error(error: Exception, operation: str) -> tuple[dict, int]:
 
 
 @recipe_bp.route("", methods=["POST"])
-@jwt_required()
+@jwt_required_with_bypass
 def create_recipe():
     """Create a new recipe with improved error handling and logging."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
         logger.info(f"Creating recipe for user {user_id}")
 
         # Get and validate request data
@@ -151,7 +151,7 @@ def create_recipe():
 
 
 @recipe_bp.route("", methods=["GET"])
-@jwt_required()
+@jwt_required_with_bypass
 def get_recipes():
     """Get all recipes (multi-tenancy read access)."""
     try:
@@ -211,11 +211,11 @@ def get_recipes():
 
 
 @recipe_bp.route("/<int:recipe_id>", methods=["GET"])
-@jwt_required()
+@jwt_required_with_bypass
 def get_recipe(recipe_id):
     """Get a specific recipe by ID."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
 
         # Get recipe
         from src.core.database import get_db_session
@@ -245,11 +245,11 @@ def get_recipe(recipe_id):
 
 
 @recipe_bp.route("/<int:recipe_id>", methods=["PUT"])
-@jwt_required()
+@jwt_required_with_bypass
 def update_recipe(recipe_id):
     """Update a specific recipe."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
 
         # Get and validate request data
         try:
@@ -333,11 +333,11 @@ def update_recipe(recipe_id):
 
 
 @recipe_bp.route("/<int:recipe_id>", methods=["DELETE"])
-@jwt_required()
+@jwt_required_with_bypass
 def delete_recipe(recipe_id):
     """Delete a specific recipe."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
 
         # Delete recipe
         from src.core.database import get_db_session
@@ -373,11 +373,11 @@ def delete_recipe(recipe_id):
 
 
 @recipe_bp.route("/search", methods=["GET"])
-@jwt_required()
+@jwt_required_with_bypass
 def search_recipes():
     """Search recipes with filters."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
 
         # Get query parameters
         query_params = request.args.to_dict()
