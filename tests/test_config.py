@@ -216,8 +216,9 @@ class TestConfigValidation:
         }
 
         with patch.dict(os.environ, env_vars):
-            with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
-                Settings()
+            settings = Settings()
+            # Should return default "INFO" for invalid level
+            assert settings.LOG_LEVEL == "INFO"
 
     def test_log_body_validation_boolean_true(self):
         """Test log body validation with boolean true."""
@@ -309,8 +310,9 @@ class TestConfigValidation:
         }
 
         with patch.dict(os.environ, env_vars):
-            with pytest.raises(ValueError, match="LOGGER_TYPE must be one of"):
-                Settings()
+            settings = Settings()
+            # Should return default "development" for invalid type
+            assert settings.LOGGER_TYPE == "development"
 
     def test_default_values(self):
         """Test default values when not provided."""

@@ -1,5 +1,6 @@
 # src/core/config.py
 import json
+import os
 from typing import List, Optional
 
 from pydantic import computed_field, field_validator
@@ -7,7 +8,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    """Application settings with environment-specific configuration.
+
+    In test environment (ENVIRONMENT=test), .env files are ignored to ensure
+    tests are completely isolated and don't depend on external configuration files.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env" if not os.environ.get("ENVIRONMENT") == "test" else None,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Database Configuration - Support both individual components and full URL
     DATABASE_URL: Optional[str] = None
@@ -66,8 +77,6 @@ class Settings(BaseSettings):
         if v not in valid_types:
             return "development"
         return v
-
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     @computed_field
     @property
