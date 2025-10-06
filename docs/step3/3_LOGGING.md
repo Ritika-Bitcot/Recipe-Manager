@@ -22,9 +22,6 @@ Configure logging through environment variables in your `.env` file:
 # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_LEVEL=INFO
 
-# Logger type: development, production, test
-LOGGER_TYPE=development
-
 # Log file path (relative to project root)
 LOG_FILE=logs/app.log
 
@@ -46,11 +43,12 @@ The system supports five log levels with hierarchical filtering:
 
 **Example**: If `LOG_LEVEL=INFO`, only INFO, WARNING, ERROR, and CRITICAL messages will be displayed. DEBUG messages will be suppressed.
 
-### Logger Types
+### Automatic Environment-Based Logging
 
-#### Development Logger (`LOGGER_TYPE=development`)
-- Human-readable format
-- Colored console output
+The logging system automatically adapts its output format based on the `ENVIRONMENT` setting:
+
+#### Development Environment (`ENVIRONMENT=development`)
+- Human-readable format with colors
 - Includes module and line numbers
 - Suitable for local development
 
@@ -58,7 +56,7 @@ The system supports five log levels with hierarchical filtering:
 2024-01-15 10:30:45 | INFO     | src.services.recipe_service:45 | Recipe created successfully
 ```
 
-#### Production Logger (`LOGGER_TYPE=production`)
+#### Production/Testing Environment (`ENVIRONMENT=production` or `ENVIRONMENT=testing`)
 - Structured JSON format
 - Machine-readable logs
 - Includes comprehensive context
@@ -365,7 +363,7 @@ logger.info("User authenticated", extra={
 - Check file permissions
 
 #### 3. JSON Format Not Working
-- Set `LOGGER_TYPE=production`
+- Set `ENVIRONMENT=production` or `ENVIRONMENT=testing`
 - Check for JSON serialization errors
 - Verify all extra data is JSON-serializable
 
@@ -384,7 +382,7 @@ logger = get_logger(__name__)
 # Log current configuration
 logger.info("Logging configuration", extra={
     "log_level": settings.LOG_LEVEL,
-    "logger_type": settings.LOGGER_TYPE,
+    "environment": settings.ENVIRONMENT,
     "log_file": settings.LOG_FILE
 })
 ```

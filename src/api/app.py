@@ -33,7 +33,6 @@ def create_app() -> Flask:
         "Starting Recipe Manager API application",
         environment=app_settings.ENVIRONMENT,
         log_level=app_settings.LOG_LEVEL,
-        logger_type=app_settings.LOGGER_TYPE,
     )
 
     app = Flask(__name__)
