@@ -149,7 +149,11 @@ def setup_structured_logging(
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
 
     # Determine output format based on environment
-    is_production = environment.lower() in ["production", "prod", "testing", "test"]
+    is_production = environment.lower() in ["production", "prod"]
+    is_testing = environment.lower() in ["testing", "test"]
+
+    # Reset structlog configuration to ensure clean state
+    structlog.reset_defaults()
 
     # Configure structlog processors
     processors = [
@@ -165,6 +169,9 @@ def setup_structured_logging(
     if is_production:
         # Production: JSON output for machine parsing
         processors.append(structlog.processors.JSONRenderer())
+    elif is_testing:
+        # Testing: JSON output for consistency
+        processors.append(structlog.processors.JSONRenderer())
     else:
         # Development: Human-readable output with colors
         processors.append(structlog.dev.ConsoleRenderer(colors=True, pad_event=25, sort_keys=True))
@@ -179,7 +186,7 @@ def setup_structured_logging(
     )
 
     # Configure standard Python logging
-    _configure_standard_logging(numeric_level, is_production, log_file)
+    _configure_standard_logging(numeric_level, is_production, is_testing, log_file)
 
     # Log successful configuration
     logger = get_logger(__name__)
@@ -192,14 +199,16 @@ def setup_structured_logging(
     )
 
 
-def _configure_standard_logging(numeric_level: int, is_production: bool, log_file: Optional[str]) -> None:
+def _configure_standard_logging(
+    numeric_level: int, is_production: bool, is_testing: bool, log_file: Optional[str]
+) -> None:
     """Configure standard Python logging to work with structlog."""
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)
 
     # Set formatter based on environment
-    if is_production:
-        # JSON formatter for production
+    if is_production or is_testing:
+        # JSON formatter for production and testing
         formatter = logging.Formatter(
             '{"timestamp": "%(asctime)s", "level": "%(levelname)s", ' '"logger": "%(name)s", "message": "%(message)s"}'
         )
@@ -229,7 +238,7 @@ def _configure_standard_logging(numeric_level: int, is_production: bool, log_fil
             log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"  # 10MB
         )
 
-        if is_production:
+        if is_production or is_testing:
             file_formatter = logging.Formatter(
                 '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
                 '"logger": "%(name)s", "message": "%(message)s"}'

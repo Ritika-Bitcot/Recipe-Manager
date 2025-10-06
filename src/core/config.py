@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "%(levelname)-8s %(asctime)s %(name)s.%(module)s:%(lineno)s | %(message)s"
     LOG_BODY: bool = False
     LOGGER_TYPE: str = "development"
+
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -42,6 +43,28 @@ class Settings(BaseSettings):
         """Validate AUTH_BYPASS_EMAIL setting."""
         if v is None or v == "" or v == "None" or v == "null":
             return None
+        return v
+
+    @field_validator("LOG_LEVEL", mode="before")
+    @classmethod
+    def validate_log_level(cls, v):
+        """Validate and normalize log level."""
+        if isinstance(v, str):
+            v = v.upper()
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v not in valid_levels:
+            return "INFO"
+        return v
+
+    @field_validator("LOGGER_TYPE", mode="before")
+    @classmethod
+    def validate_logger_type(cls, v):
+        """Validate and normalize logger type."""
+        if isinstance(v, str):
+            v = v.lower()
+        valid_types = ["development", "dev", "production", "prod", "testing", "test"]
+        if v not in valid_types:
+            return "development"
         return v
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
@@ -85,14 +108,6 @@ class Settings(BaseSettings):
         except Exception:
             raise ValueError("ALLOWED_ORIGINS must be a valid JSON array")
 
-    @field_validator("LOG_LEVEL")
-    @classmethod
-    def validate_log_level(cls, v):
-        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        if v.upper() not in valid_levels:
-            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
-        return v.upper()
-
     @field_validator("LOG_BODY", mode="before")
     @classmethod
     def parse_log_body(cls, v):
@@ -101,11 +116,3 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return False
-
-    @field_validator("LOGGER_TYPE")
-    @classmethod
-    def validate_logger_type(cls, v):
-        valid_types = ["development", "dev", "production", "prod", "test", "testing"]
-        if v.lower() not in valid_types:
-            raise ValueError(f"LOGGER_TYPE must be one of {valid_types}")
-        return v.lower()

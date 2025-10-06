@@ -12,25 +12,28 @@ from src.core.database import init_database
 from src.core.error_handler import register_exception_handlers
 from src.core.error_handlers import create_error_handler
 from src.core.middleware import setup_logging_middleware
-from src.core.settings import settings
+from src.core.settings import get_settings, settings
 from src.core.structured_logging import get_logger, setup_structured_logging
 
 
 def create_app() -> Flask:
     """Create and configure Flask application."""
+    # Get fresh settings to ensure environment variables are properly loaded
+    app_settings = get_settings()
+
     # Set up structured logging first
     setup_structured_logging(
-        log_level=settings.LOG_LEVEL,
-        environment=settings.ENVIRONMENT,
-        log_file=settings.LOG_FILE,
+        log_level=app_settings.LOG_LEVEL,
+        environment=app_settings.ENVIRONMENT,
+        log_file=app_settings.LOG_FILE,
     )
     logger = get_logger(__name__)
 
     logger.info(
         "Starting Recipe Manager API application",
-        environment=settings.ENVIRONMENT,
-        log_level=settings.LOG_LEVEL,
-        logger_type=settings.LOGGER_TYPE,
+        environment=app_settings.ENVIRONMENT,
+        log_level=app_settings.LOG_LEVEL,
+        logger_type=app_settings.LOGGER_TYPE,
     )
 
     app = Flask(__name__)

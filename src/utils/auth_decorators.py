@@ -25,7 +25,7 @@ def get_current_user_email() -> str:
     """
     # Check for authentication bypass
     if settings.AUTH_BYPASS_EMAIL:
-        logger.info(f"Bypassing authentication for development. Using email: {settings.AUTH_BYPASS_EMAIL}")
+        logger.info(f"Bypassing authentication for development. " f"Using email: {settings.AUTH_BYPASS_EMAIL}")
         return settings.AUTH_BYPASS_EMAIL
 
     # For production mode, we need to get email from the JWT token directly
@@ -67,7 +67,7 @@ def get_current_user_id() -> int:
     """
     # Check for authentication bypass
     if settings.AUTH_BYPASS_EMAIL:
-        logger.info(f"Bypassing authentication for development. Using email: {settings.AUTH_BYPASS_EMAIL}")
+        logger.info(f"Bypassing authentication for development. " f"Using email: {settings.AUTH_BYPASS_EMAIL}")
         # For bypass, we need to get the user ID from the database
         try:
             auth_service = AuthService()
@@ -168,7 +168,9 @@ def jwt_required_with_bypass(f):
         try:
             # Check for bypass first
             if settings.AUTH_BYPASS_EMAIL:
-                logger.info(f"Bypassing JWT authentication for development. Using email: {settings.AUTH_BYPASS_EMAIL}")
+                logger.info(
+                    f"Bypassing JWT authentication for development. " f"Using email: {settings.AUTH_BYPASS_EMAIL}"
+                )
                 # Get user ID for bypass user
                 auth_service = AuthService()
                 from src.core.database import get_db_session
