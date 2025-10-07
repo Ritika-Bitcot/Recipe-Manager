@@ -4,9 +4,10 @@ import logging
 from functools import wraps
 
 from flask import g
-from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
-from src.core.exceptions import AuthenticationError
+from src.core.database import get_db_session
+from src.core.exceptions import AuthenticationError, ResourceNotFoundError
 from src.core.settings import settings
 from src.services.authentication.auth_service import AuthService
 
@@ -31,18 +32,20 @@ def get_current_user_email() -> str:
     # For production mode, we need to get email from the JWT token directly
     # This function should only be called when JWT is already verified
     try:
-        # Get user ID from JWT token (this should work if @jwt_required is active)
-        user_id = get_jwt_identity()
-        if not user_id:
+        # Get email from JWT token (this should work if @jwt_required is active)
+        email = get_jwt_identity()
+        if not email:
             raise AuthenticationError("Invalid authentication credentials")
 
-        # Get user email from database
-        auth_service = AuthService()
-        from src.core.database import get_db_session
+        # If the JWT identity is already an email, return it directly
+        if isinstance(email, str) and "@" in email:
+            return email
 
+        # If it's a user ID, get the email from database
+        auth_service = AuthService()
         session = get_db_session()
         try:
-            user = auth_service.user_repository.get_by_id(session, int(user_id))
+            user = auth_service.user_repository.get_by_id(session, int(email))
             if not user:
                 raise AuthenticationError("User not found")
             return user.email
@@ -71,8 +74,6 @@ def get_current_user_id() -> int:
         # For bypass, we need to get the user ID from the database
         try:
             auth_service = AuthService()
-            from src.core.database import get_db_session
-
             session = get_db_session()
             try:
                 # Find user by email
@@ -89,11 +90,33 @@ def get_current_user_id() -> int:
 
     # Normal JWT authentication
     try:
-        user_id = get_jwt_identity()
-        if not user_id:
+        identity = get_jwt_identity()
+        if not identity:
             raise AuthenticationError("Invalid authentication credentials")
-        return int(user_id)
 
+        # If the JWT identity is already a user ID, return it directly
+        if isinstance(identity, (int, str)) and str(identity).isdigit():
+            return int(identity)
+
+        # If it's an email, get the user ID from database
+        if isinstance(identity, str) and "@" in identity:
+            auth_service = AuthService()
+            session = get_db_session()
+            try:
+                user = auth_service.user_repository.get_by_email(session, identity)
+                if not user:
+                    raise ResourceNotFoundError("User not found")
+                return user.id
+            finally:
+                if hasattr(session, "close"):
+                    session.close()
+
+        # If we can't determine what it is, try to convert to int
+        return int(identity)
+
+    except ResourceNotFoundError:
+        # Re-raise ResourceNotFoundError as-is
+        raise
     except Exception as e:
         logger.error(f"Token verification failed: {str(e)}", exc_info=True)
         raise AuthenticationError("Invalid authentication credentials")
@@ -173,8 +196,6 @@ def jwt_required_with_bypass(f):
                 )
                 # Get user ID for bypass user
                 auth_service = AuthService()
-                from src.core.database import get_db_session
-
                 session = get_db_session()
                 try:
                     user = auth_service.user_repository.get_by_email(session, settings.AUTH_BYPASS_EMAIL)
@@ -187,25 +208,30 @@ def jwt_required_with_bypass(f):
                         session.close()
             else:
                 # Normal JWT flow - verify JWT token manually
-                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
-
                 # Verify JWT token
                 verify_jwt_in_request()
-                user_id = get_jwt_identity()
-                if not user_id:
+                identity = get_jwt_identity()
+                if not identity:
                     raise AuthenticationError("Invalid authentication credentials")
 
-                # Get user email from database
+                # Get user information from database
                 auth_service = AuthService()
-                from src.core.database import get_db_session
-
                 session = get_db_session()
                 try:
-                    user = auth_service.user_repository.get_by_id(session, int(user_id))
-                    if not user:
-                        raise AuthenticationError("User not found")
-                    g.current_user_email = user.email
-                    g.current_user_id = int(user_id)
+                    # If the JWT identity is already an email, get user by email
+                    if isinstance(identity, str) and "@" in identity:
+                        user = auth_service.user_repository.get_by_email(session, identity)
+                        if not user:
+                            raise ResourceNotFoundError("User not found")
+                        g.current_user_email = user.email
+                        g.current_user_id = user.id
+                    else:
+                        # If it's a user ID, get user by ID
+                        user = auth_service.user_repository.get_by_id(session, int(identity))
+                        if not user:
+                            raise ResourceNotFoundError("User not found")
+                        g.current_user_email = user.email
+                        g.current_user_id = int(identity)
                 finally:
                     if hasattr(session, "close"):
                         session.close()
@@ -242,3 +268,15 @@ def jwt_required_with_bypass(f):
             )
 
     return decorated_function
+
+
+# Make these functions available at module level for testing
+__all__ = [
+    "get_current_user_email",
+    "get_current_user_id",
+    "auth_required",
+    "jwt_required_with_bypass",
+    "get_jwt_identity",
+    "verify_jwt_in_request",
+    "get_db_session",
+]
