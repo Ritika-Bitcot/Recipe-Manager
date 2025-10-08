@@ -9,6 +9,12 @@ from werkzeug.exceptions import HTTPException
 
 from .exceptions import BaseAppException, ValidationError
 
+# Import Pydantic validation error if available
+try:
+    from pydantic import ValidationError as PydanticValidationError
+except ImportError:
+    PydanticValidationError = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -253,8 +259,7 @@ def register_exception_handlers(app: Flask) -> None:
         )
 
     # Handle Pydantic validation errors if Pydantic is used
-    try:
-        from pydantic import ValidationError as PydanticValidationError
+    if PydanticValidationError is not None:
 
         @app.errorhandler(PydanticValidationError)
         def handle_pydantic_validation_error_handler(error: PydanticValidationError):
@@ -263,10 +268,6 @@ def register_exception_handlers(app: Flask) -> None:
                 jsonify(handle_pydantic_validation_error(error)[0]),
                 handle_pydantic_validation_error(error)[1],
             )
-
-    except ImportError:
-        # Pydantic not available, skip handler
-        pass
 
 
 def log_request_error(request, error: Exception) -> None:

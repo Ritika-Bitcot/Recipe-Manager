@@ -7,6 +7,7 @@ from flask_jwt_extended import create_access_token
 from pydantic import ValidationError as PydanticValidationError
 from werkzeug.exceptions import BadRequest
 
+from src.core.database import get_db_session
 from src.core.exceptions import AuthenticationError, ConflictError, ResourceNotFoundError, ValidationError
 from src.schemas.auth_schema import AuthResponse, ErrorResponse
 from src.schemas.user_schema import UserCreate, UserLogin
@@ -246,8 +247,6 @@ def get_current_user():
         user_id = g.current_user_id
 
         # Get user data from database
-        from src.core.database import get_db_session
-
         session = get_db_session()
         try:
             user = auth_service.user_repository.get_by_id(session, user_id)

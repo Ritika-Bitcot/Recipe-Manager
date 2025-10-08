@@ -1,12 +1,17 @@
 """SQLAlchemy-based caching service."""
 
+import json
 import time
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Any, Optional
 
+from flask import current_app
+
 from src.core.config import Settings
+from src.core.database import db, get_db_session
 from src.core.structured_logging import get_logger, log_cache_operation
+from src.models.cache_model import CacheEntry
 
 logger = get_logger(__name__)
 settings = Settings()
@@ -31,11 +36,6 @@ class CacheService:
             return
 
         try:
-            from flask import current_app
-
-            from src.core.database import db
-            from src.models.cache_model import CacheEntry
-
             # Only initialize if we're in an app context
             try:
                 app = current_app
@@ -65,11 +65,6 @@ class CacheService:
             return
 
         try:
-            from flask import current_app
-
-            from src.core.database import db
-            from src.models.cache_model import CacheEntry
-
             # Only initialize if we're in an app context
             try:
                 app = current_app
@@ -94,16 +89,12 @@ class CacheService:
 
     def _serialize(self, value: Any) -> str:
         """Serialize value for storage."""
-        import json
-
         if isinstance(value, (dict, list)):
             return json.dumps(value)
         return str(value)
 
     def _deserialize(self, value: str) -> Any:
         """Deserialize value from storage."""
-        import json
-
         try:
             return json.loads(value)
         except (json.JSONDecodeError, TypeError):
@@ -122,8 +113,6 @@ class CacheService:
             return None
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             # Get cache entry
@@ -181,8 +170,6 @@ class CacheService:
             return False
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             ttl = ttl or settings.CACHE_TTL
@@ -248,8 +235,6 @@ class CacheService:
             return False
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             result = session.query(self.cache_table).filter(self.cache_table.cache_key == key).delete()
@@ -289,8 +274,6 @@ class CacheService:
             return 0
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             # SQLAlchemy doesn't have pattern matching like Redis, so we'll use LIKE
@@ -321,8 +304,6 @@ class CacheService:
             return False
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             exists = (
@@ -355,8 +336,6 @@ class CacheService:
             return 0
 
         try:
-            from src.core.database import get_db_session
-
             session = get_db_session()
 
             result = session.query(self.cache_table).filter(self.cache_table.expires_at <= datetime.utcnow()).delete()
@@ -377,8 +356,6 @@ class CacheService:
 
 def cache_key(prefix: str, *args, **kwargs) -> str:
     """Generate cache key from prefix and arguments."""
-    import json
-
     key_parts = [prefix]
 
     # Add positional arguments

@@ -6,6 +6,7 @@ import logging
 from flask import Blueprint, g, jsonify, request
 from pydantic import ValidationError as PydanticValidationError
 
+from src.core.database import get_db_session
 from src.core.exceptions import ResourceNotFoundError, UnauthorizedError, ValidationError
 from src.schemas.auth_schema import ErrorResponse
 from src.schemas.recipe_schema import RecipeCreate, RecipeUpdate
@@ -131,8 +132,6 @@ def create_recipe():
             return _handle_pydantic_validation_error(e)
 
         # Create recipe
-        from src.core.database import get_db_session
-
         session = get_db_session()
         result = recipe_service.create_recipe(session, recipe_data, user_id)
         logger.info(f"Successfully created recipe {result.get('id', 'unknown')} " f"for user {user_id}")
@@ -184,8 +183,6 @@ def get_recipes():
             )
 
         # Get all recipes
-        from src.core.database import get_db_session
-
         session = get_db_session()
         result = recipe_service.list_recipes(session, page=page, per_page=per_page)
 
@@ -218,8 +215,6 @@ def get_recipe(recipe_id):
         user_id = g.current_user_id
 
         # Get recipe
-        from src.core.database import get_db_session
-
         session = get_db_session()
         result = recipe_service.get_recipe(session, recipe_id, user_id)
 
@@ -294,8 +289,6 @@ def update_recipe(recipe_id):
             )
 
         # Update recipe
-        from src.core.database import get_db_session
-
         session = get_db_session()
         result = recipe_service.update_recipe(session, recipe_id, recipe_data, user_id)
 
@@ -340,8 +333,6 @@ def delete_recipe(recipe_id):
         user_id = g.current_user_id
 
         # Delete recipe
-        from src.core.database import get_db_session
-
         session = get_db_session()
         result = recipe_service.delete_recipe(session, recipe_id, user_id)
 
@@ -424,8 +415,6 @@ def search_recipes():
                 )
 
         # Get database session
-        from src.core.database import get_db_session
-
         session = get_db_session()
 
         # Search recipes

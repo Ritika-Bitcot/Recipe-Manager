@@ -3,7 +3,7 @@
 import logging
 from functools import wraps
 
-from flask import g
+from flask import g, jsonify
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 
 from src.core.database import get_db_session
@@ -148,7 +148,6 @@ def auth_required(f):
 
         except AuthenticationError as e:
             logger.warning(f"Authentication failed: {str(e)}")
-            from flask import jsonify
 
             return (
                 jsonify(
@@ -162,7 +161,6 @@ def auth_required(f):
             )
         except Exception as e:
             logger.error(f"Unexpected error during authentication: {str(e)}", exc_info=True)
-            from flask import jsonify
 
             return (
                 jsonify(
@@ -240,7 +238,6 @@ def jwt_required_with_bypass(f):
 
         except AuthenticationError as e:
             logger.warning(f"Authentication failed: {str(e)}")
-            from flask import jsonify
 
             return (
                 jsonify(
@@ -254,7 +251,6 @@ def jwt_required_with_bypass(f):
             )
         except Exception as e:
             logger.error(f"Unexpected error during authentication: {str(e)}", exc_info=True)
-            from flask import jsonify
 
             return (
                 jsonify(
