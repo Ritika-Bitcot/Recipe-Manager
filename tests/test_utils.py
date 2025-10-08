@@ -46,6 +46,51 @@ class TestJWTHelper:
         assert isinstance(token, str)
         assert len(token) > 0
 
+    def test_token_expiration_duration(self, jwt_helper):
+        """Test that token expires after the correct duration from configuration."""
+        # Setup
+        user_id = 1
+        email = "test@example.com"
+
+        # Generate token
+        token = jwt_helper.generate_token(user_id, email)
+
+        # Decode token to check expiration without verification
+        import jwt
+
+        from src.core.settings import settings
+
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": False},  # Don't verify expiration yet
+        )
+
+        # Get the issued at time and expiration time from the token
+        iat_timestamp = payload.get("iat")
+        exp_timestamp = payload.get("exp")
+
+        # Convert to datetime objects
+        iat_datetime = datetime.fromtimestamp(iat_timestamp)
+        exp_datetime = datetime.fromtimestamp(exp_timestamp)
+
+        # Calculate the actual duration between issued at and expiration
+        actual_duration = exp_datetime - iat_datetime
+        expected_duration = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+        # Check that the duration matches the configuration setting
+        duration_diff = abs((actual_duration - expected_duration).total_seconds())
+        assert (
+            duration_diff < 2
+        ), f"Token duration {actual_duration} differs by {duration_diff} seconds from expected {expected_duration}"
+
+        # Also verify that expiration is in the future
+        current_time = datetime.utcnow()
+        assert (
+            exp_datetime > current_time
+        ), f"Token expiration {exp_datetime} is not in the future (current: {current_time})"
+
     def test_verify_token_success(self, jwt_helper):
         """Test successful token verification."""
         # Setup
