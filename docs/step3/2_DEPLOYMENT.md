@@ -488,7 +488,7 @@ lsof -p $(pgrep -f "python.*src.api.app")
 
 ### Horizontal Scaling
 
-1. **Load Balancer**: Use nginx or AWS ALB
+1. **Load Balancer**: Use AWS ALB, CloudFlare, or other load balancer
 2. **Multiple Instances**: Run multiple app instances
 3. **Database Connection Pooling**: Use pgbouncer
 4. **Caching**: Implement Redis for caching

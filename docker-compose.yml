@@ -1,0 +1,96 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: recipe_manager_db
+    environment:
+      POSTGRES_DB: recipe
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5434:5432"
+    networks:
+      - recipe_manager_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d recipe" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: recipe_manager_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - recipe_manager_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recipe_manager_app
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/recipe
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: recipe
+      DB_USER: postgres
+      DB_PASSWORD: password
+
+      # Application Configuration
+      SECRET_KEY: your-production-secret-key-change-this
+      ALLOWED_ORIGINS: '["*"]'
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+
+      # JWT Configuration
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+
+      # Cache Configuration
+      CACHE_TTL: 300
+      ENABLE_CACHE: "true"
+
+      # Redis Configuration (if using Redis)
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - recipe_manager_network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  recipe_manager_network:
+    driver: bridge
