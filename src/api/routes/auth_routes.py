@@ -2,15 +2,17 @@
 
 import json
 
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask import Blueprint, g, jsonify, request
+from flask_jwt_extended import create_access_token
 from pydantic import ValidationError as PydanticValidationError
 from werkzeug.exceptions import BadRequest
 
+from src.core.database import get_db_session
 from src.core.exceptions import AuthenticationError, ConflictError, ResourceNotFoundError, ValidationError
 from src.schemas.auth_schema import AuthResponse, ErrorResponse
 from src.schemas.user_schema import UserCreate, UserLogin
 from src.services.authentication.auth_service import AuthService
+from src.utils.auth_decorators import jwt_required_with_bypass
 
 # Create blueprint
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -75,7 +77,11 @@ def register():
         response = AuthResponse(
             message=result["message"],
             user=result["user"],
-            token={"access_token": token, "token_type": "bearer", "expires_in": 3600},
+            token={
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": 3600,
+            },
         )
 
         return jsonify(response.model_dump()), 201
@@ -180,7 +186,11 @@ def login():
         response = AuthResponse(
             message=result["message"],
             user=result["user"],
-            token={"access_token": token, "token_type": "bearer", "expires_in": 3600},
+            token={
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": 3600,
+            },
         )
 
         return jsonify(response.model_dump()), 200
@@ -230,16 +240,33 @@ def login():
 
 
 @auth_bp.route("/me", methods=["GET"])
-@jwt_required()
+@jwt_required_with_bypass
 def get_current_user():
     """Get current user information."""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = g.current_user_id
 
-        # Get user data using auth service
-        result = auth_service.get_current_user(user_id)
+        # Get user data from database
+        session = get_db_session()
+        try:
+            user = auth_service.user_repository.get_by_id(session, user_id)
+            if not user:
+                raise ResourceNotFoundError("User", user_id)
 
-        return jsonify(result), 200
+            result = {
+                "message": "User information retrieved successfully",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "is_active": user.is_active,
+                    "created_at": (user.created_at.isoformat() if user.created_at else None),
+                    "updated_at": (user.updated_at.isoformat() if user.updated_at else None),
+                },
+            }
+
+            return jsonify(result), 200
+        finally:
+            session.close()
 
     except ResourceNotFoundError as e:
         return (

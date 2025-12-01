@@ -1,6 +1,7 @@
 """Tests for utility functions."""
 
 from datetime import datetime, timedelta
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -44,6 +45,51 @@ class TestJWTHelper:
         # Assert
         assert isinstance(token, str)
         assert len(token) > 0
+
+    def test_token_expiration_duration(self, jwt_helper):
+        """Test that token expires after the correct duration from configuration."""
+        # Setup
+        user_id = 1
+        email = "test@example.com"
+
+        # Generate token
+        token = jwt_helper.generate_token(user_id, email)
+
+        # Decode token to check expiration without verification
+        import jwt
+
+        from src.core.settings import settings
+
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": False},  # Don't verify expiration yet
+        )
+
+        # Get the issued at time and expiration time from the token
+        iat_timestamp = payload.get("iat")
+        exp_timestamp = payload.get("exp")
+
+        # Convert to datetime objects
+        iat_datetime = datetime.fromtimestamp(iat_timestamp)
+        exp_datetime = datetime.fromtimestamp(exp_timestamp)
+
+        # Calculate the actual duration between issued at and expiration
+        actual_duration = exp_datetime - iat_datetime
+        expected_duration = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+        # Check that the duration matches the configuration setting
+        duration_diff = abs((actual_duration - expected_duration).total_seconds())
+        assert (
+            duration_diff < 2
+        ), f"Token duration {actual_duration} differs by {duration_diff} seconds from expected {expected_duration}"
+
+        # Also verify that expiration is in the future
+        current_time = datetime.utcnow()
+        assert (
+            exp_datetime > current_time
+        ), f"Token expiration {exp_datetime} is not in the future (current: {current_time})"
 
     def test_verify_token_success(self, jwt_helper):
         """Test successful token verification."""
@@ -368,3 +414,250 @@ class TestPasswordHelper:
 
         # All hashes should be different
         assert len(set(hashes)) == len(hashes)
+
+
+class TestAuthDecorators:
+    """Test auth decorators functionality."""
+
+    def test_get_current_user_email_bypass(self):
+        """Test get_current_user_email with bypass enabled."""
+        from src.utils.auth_decorators import get_current_user_email
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = "test@example.com"
+
+            result = get_current_user_email()
+
+            assert result == "test@example.com"
+
+    def test_get_current_user_email_jwt_success(self):
+        """Test get_current_user_email with JWT authentication."""
+        from src.utils.auth_decorators import get_current_user_email
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = None
+
+            with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                mock_jwt.return_value = "test@example.com"
+
+                result = get_current_user_email()
+
+                assert result == "test@example.com"
+
+    def test_get_current_user_email_jwt_failure(self):
+        """Test get_current_user_email with JWT authentication failure."""
+        from src.utils.auth_decorators import get_current_user_email
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = None
+
+            with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                mock_jwt.return_value = None
+
+                with pytest.raises(AuthenticationError):
+                    get_current_user_email()
+
+    def test_get_current_user_id_bypass(self):
+        """Test get_current_user_id with bypass enabled."""
+        from src.utils.auth_decorators import get_current_user_id
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = "test@example.com"
+
+            with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                mock_auth_service = Mock()
+                mock_auth_service_class.return_value = mock_auth_service
+
+                mock_user = Mock()
+                mock_user.id = 123
+                mock_auth_service.user_repository.get_by_email.return_value = mock_user
+
+                with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                    mock_session = Mock()
+                    mock_get_session.return_value = mock_session
+
+                    result = get_current_user_id()
+
+                    assert result == 123
+
+    def test_get_current_user_id_jwt_success(self):
+        """Test get_current_user_id with JWT authentication."""
+        from src.utils.auth_decorators import get_current_user_id
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = None
+
+            with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                mock_jwt.return_value = "test@example.com"
+
+                with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                    mock_auth_service = Mock()
+                    mock_auth_service_class.return_value = mock_auth_service
+
+                    mock_user = Mock()
+                    mock_user.id = 123
+                    mock_auth_service.user_repository.get_by_email.return_value = mock_user
+
+                    with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                        mock_session = Mock()
+                        mock_get_session.return_value = mock_session
+
+                        result = get_current_user_id()
+
+                        assert result == 123
+
+    def test_get_current_user_id_user_not_found(self):
+        """Test get_current_user_id when user is not found."""
+        from src.core.exceptions import ResourceNotFoundError
+        from src.utils.auth_decorators import get_current_user_id
+
+        with patch("src.utils.auth_decorators.settings") as mock_settings:
+            mock_settings.AUTH_BYPASS_EMAIL = None
+
+            with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                mock_jwt.return_value = "test@example.com"
+
+                with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                    mock_auth_service = Mock()
+                    mock_auth_service_class.return_value = mock_auth_service
+
+                    mock_auth_service.user_repository.get_by_email.return_value = None
+
+                    with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                        mock_session = Mock()
+                        mock_get_session.return_value = mock_session
+
+                        with pytest.raises(ResourceNotFoundError):
+                            get_current_user_id()
+
+    def test_jwt_required_with_bypass_decorator_bypass(self):
+        """Test jwt_required_with_bypass decorator with bypass enabled."""
+        from flask import Flask
+
+        from src.utils.auth_decorators import jwt_required_with_bypass
+
+        app = Flask(__name__)
+
+        @jwt_required_with_bypass
+        def test_function():
+            return "success"
+
+        with app.app_context():
+            with patch("src.utils.auth_decorators.settings") as mock_settings:
+                mock_settings.AUTH_BYPASS_EMAIL = "test@example.com"
+
+                with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                    mock_auth_service = Mock()
+                    mock_auth_service_class.return_value = mock_auth_service
+
+                    mock_user = Mock()
+                    mock_user.id = 123
+                    mock_auth_service.user_repository.get_by_email.return_value = mock_user
+
+                    with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                        mock_session = Mock()
+                        mock_get_session.return_value = mock_session
+
+                        result = test_function()
+
+                        assert result == "success"
+
+    def test_jwt_required_with_bypass_decorator_jwt_success(self):
+        """Test jwt_required_with_bypass decorator with JWT authentication."""
+        from flask import Flask
+
+        from src.utils.auth_decorators import jwt_required_with_bypass
+
+        app = Flask(__name__)
+
+        @jwt_required_with_bypass
+        def test_function():
+            return "success"
+
+        with app.app_context():
+            with patch("src.utils.auth_decorators.settings") as mock_settings:
+                mock_settings.AUTH_BYPASS_EMAIL = None
+
+                with patch("src.utils.auth_decorators.verify_jwt_in_request") as mock_verify:
+                    mock_verify.return_value = None
+
+                    with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                        mock_jwt.return_value = "test@example.com"
+
+                        with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                            mock_auth_service = Mock()
+                            mock_auth_service_class.return_value = mock_auth_service
+
+                            mock_user = Mock()
+                            mock_user.id = 123
+                            mock_auth_service.user_repository.get_by_email.return_value = mock_user
+
+                            with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                                mock_session = Mock()
+                                mock_get_session.return_value = mock_session
+
+                                result = test_function()
+
+                                assert result == "success"
+
+    def test_jwt_required_with_bypass_decorator_jwt_failure(self):
+        """Test jwt_required_with_bypass decorator with JWT authentication failure."""
+        from flask import Flask
+
+        from src.core.exceptions import AuthenticationError
+        from src.utils.auth_decorators import jwt_required_with_bypass
+
+        app = Flask(__name__)
+
+        @jwt_required_with_bypass
+        def test_function():
+            return "success"
+
+        with app.app_context():
+            with patch("src.utils.auth_decorators.settings") as mock_settings:
+                mock_settings.AUTH_BYPASS_EMAIL = None
+
+                with patch("src.utils.auth_decorators.verify_jwt_in_request") as mock_verify:
+                    mock_verify.side_effect = AuthenticationError("Invalid token")
+
+                    result = test_function()
+
+                    # The decorator should return a JSON response, not raise an exception
+                    assert result[1] == 401  # Status code
+
+    def test_jwt_required_with_bypass_decorator_user_not_found(self):
+        """Test jwt_required_with_bypass decorator when user is not found."""
+        from flask import Flask
+
+        from src.utils.auth_decorators import jwt_required_with_bypass
+
+        app = Flask(__name__)
+
+        @jwt_required_with_bypass
+        def test_function():
+            return "success"
+
+        with app.app_context():
+            with patch("src.utils.auth_decorators.settings") as mock_settings:
+                mock_settings.AUTH_BYPASS_EMAIL = None
+
+                with patch("src.utils.auth_decorators.verify_jwt_in_request") as mock_verify:
+                    mock_verify.return_value = None
+
+                    with patch("src.utils.auth_decorators.get_jwt_identity") as mock_jwt:
+                        mock_jwt.return_value = "test@example.com"
+
+                        with patch("src.utils.auth_decorators.AuthService") as mock_auth_service_class:
+                            mock_auth_service = Mock()
+                            mock_auth_service_class.return_value = mock_auth_service
+
+                            mock_auth_service.user_repository.get_by_email.return_value = None
+
+                            with patch("src.utils.auth_decorators.get_db_session") as mock_get_session:
+                                mock_session = Mock()
+                                mock_get_session.return_value = mock_session
+
+                                result = test_function()
+
+                                # The decorator should return a JSON response, not raise an exception
+                                assert result[1] == 500  # Status code for internal server error

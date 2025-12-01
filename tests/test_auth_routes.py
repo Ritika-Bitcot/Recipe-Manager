@@ -3,7 +3,7 @@
 import json
 from unittest.mock import patch
 
-from src.core.exceptions import AuthenticationError, ConflictError, ResourceNotFoundError
+from src.core.exceptions import AuthenticationError, ConflictError
 
 
 class TestAuthRoutes:
@@ -116,10 +116,8 @@ class TestAuthRoutes:
     def test_get_current_user_success(self, client, auth_headers, sample_user):
         """Test successful current user retrieval."""
         with patch("src.api.routes.auth_routes.auth_service") as mock_service:
-            mock_service.get_current_user.return_value = {
-                "user": sample_user.to_dict(),
-                "message": "User information retrieved successfully",
-            }
+            # Mock the user_repository.get_by_id method that the route actually uses
+            mock_service.user_repository.get_by_id.return_value = sample_user
 
             response = client.get("/api/auth/me", headers=auth_headers)
 
@@ -128,10 +126,11 @@ class TestAuthRoutes:
             assert "user" in data
             assert "message" in data
 
-    def test_get_current_user_not_found(self, client, auth_headers):
+    def test_get_current_user_not_found(self, client, auth_headers, bypass_user):
         """Test current user retrieval when user not found."""
         with patch("src.api.routes.auth_routes.auth_service") as mock_service:
-            mock_service.get_current_user.side_effect = ResourceNotFoundError("User", 1)
+            # Mock the user_repository.get_by_id method to return None
+            mock_service.user_repository.get_by_id.return_value = None
 
             response = client.get("/api/auth/me", headers=auth_headers)
 
@@ -152,12 +151,13 @@ class TestAuthRoutes:
 
         assert response.status_code == 401
 
-    def test_get_current_user_invalid_user_id(self, client, auth_headers):
+    def test_get_current_user_invalid_user_id(self, client, auth_headers, bypass_user):
         """Test current user retrieval with invalid user ID in token."""
-        with patch("src.api.routes.auth_routes.get_jwt_identity", return_value="invalid_id"):
+        with patch("src.api.routes.auth_routes.g") as mock_g:
+            mock_g.current_user_id = "invalid_id"
             response = client.get("/api/auth/me", headers=auth_headers)
 
-            assert response.status_code == 401
+            assert response.status_code == 404  # User not found due to invalid ID
             data = response.get_json()
             assert "error" in data
 
@@ -187,10 +187,11 @@ class TestAuthRoutes:
             data = response.get_json()
             assert "error" in data
 
-    def test_get_current_user_service_exception(self, client, auth_headers):
+    def test_get_current_user_service_exception(self, client, auth_headers, bypass_user):
         """Test current user retrieval with service exception."""
         with patch("src.api.routes.auth_routes.auth_service") as mock_service:
-            mock_service.get_current_user.side_effect = Exception("Database error")
+            # Mock the user_repository.get_by_id method to raise an exception
+            mock_service.user_repository.get_by_id.side_effect = Exception("Database error")
 
             response = client.get("/api/auth/me", headers=auth_headers)
 

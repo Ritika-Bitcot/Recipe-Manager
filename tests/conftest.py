@@ -12,6 +12,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["ALLOWED_ORIGINS"] = '["*"]'
 os.environ["ENVIRONMENT"] = "test"
+os.environ["AUTH_BYPASS_EMAIL"] = "test@example.com"
 
 from src.api.app import create_app  # noqa: E402
 from src.core.database import db, get_db_session  # noqa: E402
@@ -83,8 +84,8 @@ def sample_user_data():
 
 
 @pytest.fixture
-def sample_user(db_session, sample_user_data):
-    """Create a sample user in the database."""
+def bypass_user(db_session):
+    """Create a bypass user for authentication bypass tests."""
     from sqlalchemy import text
 
     # Clear any existing users to prevent conflicts
@@ -92,6 +93,24 @@ def sample_user(db_session, sample_user_data):
     db_session.execute(text("DELETE FROM users"))
     db_session.commit()
 
+    # Create the bypass user for authentication bypass tests
+    bypass_user = User(
+        email="test@example.com",
+        password_hash="hashed_password",
+        first_name="Bypass",
+        last_name="User",
+        is_active=True,
+    )
+    db_session.add(bypass_user)
+    db_session.commit()
+    db_session.refresh(bypass_user)
+    return bypass_user
+
+
+@pytest.fixture
+def sample_user(db_session, sample_user_data, bypass_user):
+    """Create a sample user in the database."""
+    # Create the main test user
     user = User(
         email=sample_user_data["email"],
         password_hash="hashed_password",

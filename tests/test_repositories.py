@@ -323,6 +323,63 @@ class TestRecipeRepository:
         # Assert
         assert result == 15
 
+    def test_get_user_recipes(self, recipe_repo, mock_session):
+        """Test getting recipes by user ID (alias method)."""
+        # Setup
+        mock_recipes = [Mock(), Mock()]
+        mock_query = Mock()
+        mock_query.filter.return_value.offset.return_value.limit.return_value.all.return_value = mock_recipes
+        mock_session.query.return_value = mock_query
+
+        # Execute
+        result = recipe_repo.get_user_recipes(mock_session, user_id=1, skip=0, limit=10)
+
+        # Assert
+        assert result == mock_recipes
+
+    def test_count_user_recipes(self, recipe_repo, mock_session):
+        """Test counting recipes by user ID (alias method)."""
+        # Setup
+        mock_query = Mock()
+        mock_query.filter.return_value.count.return_value = 5
+        mock_session.query.return_value = mock_query
+
+        # Execute
+        result = recipe_repo.count_user_recipes(mock_session, user_id=1)
+
+        # Assert
+        assert result == 5
+
+    def test_count_search_recipes(self, recipe_repo, mock_session):
+        """Test counting search results."""
+        # Setup
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query  # Return self for chaining
+        mock_query.count.return_value = 3
+        mock_session.query.return_value = mock_query
+
+        # Execute
+        search_params = {"search": "pasta"}
+        result = recipe_repo.count_search_recipes(mock_session, user_id=1, search_params=search_params)
+
+        # Assert
+        assert result == 3
+
+    def test_count_search_recipes_with_filters(self, recipe_repo, mock_session):
+        """Test counting search results with multiple filters."""
+        # Setup
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query  # Return self for chaining
+        mock_query.count.return_value = 2
+        mock_session.query.return_value = mock_query
+
+        # Execute
+        search_params = {"search": "pasta", "difficulty": "easy", "prep_time_max": 30}
+        result = recipe_repo.count_search_recipes(mock_session, user_id=1, search_params=search_params)
+
+        # Assert
+        assert result == 2
+
 
 class TestUserRepository:
     """Test user repository specific functionality."""

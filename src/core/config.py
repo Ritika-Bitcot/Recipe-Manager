@@ -1,5 +1,6 @@
 # src/core/config.py
 import json
+import os
 from typing import List, Optional
 
 from pydantic import computed_field, field_validator
@@ -7,7 +8,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    """Application settings with environment-specific configuration.
+
+    In test environment (ENVIRONMENT=test), .env files are ignored to ensure
+    tests are completely isolated and don't depend on external configuration files.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env" if not os.environ.get("ENVIRONMENT") == "test" else None,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Database Configuration - Support both individual components and full URL
     DATABASE_URL: Optional[str] = None
@@ -26,6 +37,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "%(levelname)-8s %(asctime)s %(name)s.%(module)s:%(lineno)s | %(message)s"
     LOG_BODY: bool = False
     LOGGER_TYPE: str = "development"
+
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -33,7 +45,38 @@ class Settings(BaseSettings):
     CACHE_TTL: int = 300  # 5 minutes default TTL
     ENABLE_CACHE: bool = True
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+    # Authentication Bypass for Development
+    AUTH_BYPASS_EMAIL: Optional[str] = None
+
+    @field_validator("AUTH_BYPASS_EMAIL", mode="before")
+    @classmethod
+    def validate_auth_bypass_email(cls, v):
+        """Validate AUTH_BYPASS_EMAIL setting."""
+        if v is None or v == "" or v == "None" or v == "null":
+            return None
+        return v
+
+    @field_validator("LOG_LEVEL", mode="before")
+    @classmethod
+    def validate_log_level(cls, v):
+        """Validate and normalize log level."""
+        if isinstance(v, str):
+            v = v.upper()
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if v not in valid_levels:
+            return "INFO"
+        return v
+
+    @field_validator("LOGGER_TYPE", mode="before")
+    @classmethod
+    def validate_logger_type(cls, v):
+        """Validate and normalize logger type."""
+        if isinstance(v, str):
+            v = v.lower()
+        valid_types = ["development", "dev", "production", "prod", "testing", "test"]
+        if v not in valid_types:
+            return "development"
+        return v
 
     @computed_field
     @property
@@ -74,14 +117,6 @@ class Settings(BaseSettings):
         except Exception:
             raise ValueError("ALLOWED_ORIGINS must be a valid JSON array")
 
-    @field_validator("LOG_LEVEL")
-    @classmethod
-    def validate_log_level(cls, v):
-        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        if v.upper() not in valid_levels:
-            raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
-        return v.upper()
-
     @field_validator("LOG_BODY", mode="before")
     @classmethod
     def parse_log_body(cls, v):
@@ -90,11 +125,3 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.lower() in ("true", "1", "yes", "on")
         return False
-
-    @field_validator("LOGGER_TYPE")
-    @classmethod
-    def validate_logger_type(cls, v):
-        valid_types = ["development", "dev", "production", "prod", "test", "testing"]
-        if v.lower() not in valid_types:
-            raise ValueError(f"LOGGER_TYPE must be one of {valid_types}")
-        return v.lower()

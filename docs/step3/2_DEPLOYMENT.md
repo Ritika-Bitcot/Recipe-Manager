@@ -68,7 +68,6 @@ LOG_LEVEL=INFO
 LOG_FILE=app.log
 LOG_FORMAT=%(levelname)-8s %(asctime)s %(name)s.%(module)s:%(lineno)s | %(message)s
 LOG_BODY=false
-LOGGER_TYPE=development
 
 # JWT Configuration
 ALGORITHM=HS256
@@ -362,7 +361,6 @@ ALLOWED_ORIGINS=["https://yourdomain.com", "https://api.yourdomain.com"]
 
 # Enable production logging
 LOG_LEVEL=INFO
-LOGGER_TYPE=production
 ```
 
 ## 📊 Monitoring & Logging

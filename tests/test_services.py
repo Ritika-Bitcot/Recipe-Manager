@@ -65,6 +65,41 @@ class TestPasswordService:
         with pytest.raises(ValidationError):
             service.hash_password("weak")
 
+    def test_get_password_strength_analysis(self):
+        """Test password strength analysis method."""
+        service = PasswordService()
+        result = service.get_password_strength_analysis("StrongPassword123!")
+
+        assert "score" in result
+        assert "strength" in result
+        assert "warnings" in result
+        assert isinstance(result["score"], int)
+        assert isinstance(result["strength"], str)
+
+    def test_is_password_strong_enough_good(self):
+        """Test password strength check with good password."""
+        service = PasswordService()
+        result = service.is_password_strong_enough("StrongPassword123!", "good")
+        assert result is True
+
+    def test_is_password_strong_enough_strong(self):
+        """Test password strength check with strong password."""
+        service = PasswordService()
+        result = service.is_password_strong_enough("VeryStrongPassword123!@#", "strong")
+        assert result is True
+
+    def test_is_password_strong_enough_weak(self):
+        """Test password strength check with weak password."""
+        service = PasswordService()
+        result = service.is_password_strong_enough("weak", "good")
+        assert result is False
+
+    def test_is_password_strong_enough_validation_error(self):
+        """Test password strength check with validation error."""
+        service = PasswordService()
+        result = service.is_password_strong_enough("", "good")
+        assert result is False
+
 
 class TestAuthService:
     """Test authentication service functionality."""
